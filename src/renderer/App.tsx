@@ -371,6 +371,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         workspaceName={currentWorkspace?.name}
+        repoPath={selectedRepo || undefined}
         worktreePath={activeWorktree?.path}
         workspaceCollapsed={workspaceCollapsed}
         worktreeCollapsed={worktreeCollapsed}

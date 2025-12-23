@@ -23,6 +23,7 @@ interface MainContentProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   workspaceName?: string;
+  repoPath?: string; // repository path for session storage
   worktreePath?: string;
   workspaceCollapsed?: boolean;
   worktreeCollapsed?: boolean;
@@ -41,6 +42,7 @@ export function MainContent({
   activeTab,
   onTabChange,
   workspaceName,
+  repoPath,
   worktreePath,
   workspaceCollapsed = false,
   worktreeCollapsed = false,
@@ -153,8 +155,8 @@ export function MainContent({
       <div className="relative flex-1 overflow-hidden">
         {/* Chat tab - keep mounted to preserve terminal session */}
         <div className={cn("absolute inset-0", activeTab !== 'chat' && "invisible")}>
-          {worktreePath ? (
-            <ChatPanel key={worktreePath} cwd={worktreePath} />
+          {repoPath && worktreePath ? (
+            <ChatPanel repoPath={repoPath} cwd={worktreePath} />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">
               <p>请先选择一个 Worktree</p>

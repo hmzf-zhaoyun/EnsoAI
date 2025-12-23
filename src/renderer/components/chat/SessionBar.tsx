@@ -6,10 +6,10 @@ const STORAGE_KEY = 'enso-session-bar';
 const EDGE_THRESHOLD = 20; // pixels from edge
 
 export interface Session {
-  id: string;
+  id: string; // UUID, also used for claude --session-id
   name: string;
-  claudeSessionId: string; // UUID for claude --session-id
   initialized: boolean; // true after first run, use --resume to restore
+  cwd: string; // worktree path this session belongs to
 }
 
 interface SessionBarProps {

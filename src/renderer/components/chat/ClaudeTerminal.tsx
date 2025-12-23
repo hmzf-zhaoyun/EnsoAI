@@ -1,8 +1,8 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
-import { Terminal, ITheme } from '@xterm/xterm';
+import { useSettingsStore } from '@/stores/settings';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { useSettingsStore } from '@/stores/settings';
+import { type ITheme, Terminal } from '@xterm/xterm';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import '@xterm/xterm/css/xterm.css';
 
 // Dark theme (Ayu Dark - from Ghostty config)
@@ -61,6 +61,7 @@ interface ClaudeTerminalProps {
   cwd?: string;
   sessionId?: string;
   initialized?: boolean;
+  isActive?: boolean; // true when this terminal should be visible/active
   onInitialized?: () => void;
   onExit?: () => void;
 }
@@ -76,7 +77,14 @@ function useIsDarkMode() {
   }, [theme]);
 }
 
-export function ClaudeTerminal({ cwd, sessionId, initialized, onInitialized, onExit }: ClaudeTerminalProps) {
+export function ClaudeTerminal({
+  cwd,
+  sessionId,
+  initialized,
+  isActive = false,
+  onInitialized,
+  onExit,
+}: ClaudeTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const isDarkMode = useIsDarkMode();
@@ -89,6 +97,8 @@ export function ClaudeTerminal({ cwd, sessionId, initialized, onInitialized, onE
   onExitRef.current = onExit;
   const onInitializedRef = useRef(onInitialized);
   onInitializedRef.current = onInitialized;
+  // Track if terminal has ever been activated (for lazy loading)
+  const hasBeenActivatedRef = useRef(false);
 
   const initTerminal = useCallback(async () => {
     if (!containerRef.current || terminalRef.current) return;
@@ -162,16 +172,29 @@ export function ClaudeTerminal({ cwd, sessionId, initialized, onInitialized, onE
         }
       });
     } catch (error) {
-      terminal.writeln('\x1b[31mFailed to start claude. Make sure claude is installed and in PATH.\x1b[0m');
+      terminal.writeln(
+        '\x1b[31mFailed to start claude. Make sure claude is installed and in PATH.\x1b[0m'
+      );
       terminal.writeln(`\x1b[33mError: ${error}\x1b[0m`);
       terminal.writeln('\x1b[90mInstall claude: npm install -g @anthropic-ai/claude-code\x1b[0m');
     }
   }, [cwd]);
 
-  // Initialize terminal
+  // Lazy initialization: only init when first activated and visible
   useEffect(() => {
-    initTerminal();
+    if (isActive && !hasBeenActivatedRef.current) {
+      hasBeenActivatedRef.current = true;
+      // Wait for next frame to ensure container is visible and has dimensions
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          initTerminal();
+        });
+      });
+    }
+  }, [isActive, initTerminal]);
 
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (cleanupRef.current) {
         cleanupRef.current();
@@ -187,7 +210,7 @@ export function ClaudeTerminal({ cwd, sessionId, initialized, onInitialized, onE
         terminalRef.current = null;
       }
     };
-  }, [initTerminal]);
+  }, []);
 
   // Update theme dynamically when settings change
   useEffect(() => {
