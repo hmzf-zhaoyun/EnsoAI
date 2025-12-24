@@ -98,6 +98,17 @@ export function AgentTerminal({
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
+    // Handle Shift+Enter for newline (like Ghostty: shift+enter=text:\x1b\r)
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.key === 'Enter' && event.shiftKey) {
+        if (ptyIdRef.current) {
+          window.electronAPI.terminal.write(ptyIdRef.current, '\x1b\r');
+        }
+        return false; // Prevent default handling
+      }
+      return true;
+    });
+
     // Create pty session running agent command
     try {
       // Only Claude supports --session-id/--resume for session persistence
