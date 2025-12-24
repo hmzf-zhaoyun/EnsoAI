@@ -283,11 +283,6 @@ export function useXterm({
       // 30ms delay merges fragmented TUI packets (clear + write)
       const cleanup = window.electronAPI.terminal.onData((event) => {
         if (event.id === ptyId) {
-          if (!hasReceivedDataRef.current) {
-            hasReceivedDataRef.current = true;
-            setIsLoading(false);
-          }
-
           // Buffer data
           writeBufferRef.current += event.data;
 
@@ -297,6 +292,11 @@ export function useXterm({
               if (writeBufferRef.current.length > 0) {
                 const bufferedData = writeBufferRef.current;
                 terminal.write(bufferedData);
+                // Hide loading after first write to terminal (not when data received)
+                if (!hasReceivedDataRef.current) {
+                  hasReceivedDataRef.current = true;
+                  setIsLoading(false);
+                }
                 // Call onData after write to avoid React re-render storm
                 onDataRef.current?.(bufferedData);
                 writeBufferRef.current = '';

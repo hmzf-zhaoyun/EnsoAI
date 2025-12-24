@@ -27,6 +27,8 @@ export class FileWatcher {
       },
       {
         ignore: ['node_modules', '.git', 'dist', 'out'],
+        // Use native backend to avoid watchman dependency
+        backend: process.platform === 'win32' ? 'windows' : undefined,
       }
     );
   }

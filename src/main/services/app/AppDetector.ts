@@ -229,7 +229,13 @@ export class AppDetector {
         name: 'Windows Terminal',
         id: 'windows.terminal',
         category: AppCategory.Terminal,
-        exePaths: [join(localAppData, 'Microsoft', 'WindowsApps', 'wt.exe')],
+        exePaths: [
+          join(localAppData, 'Microsoft', 'WindowsApps', 'wt.exe'),
+          // Preview version
+          join(localAppData, 'Microsoft', 'WindowsApps', 'wtd.exe'),
+          // Use command name as fallback (will be resolved via PATH)
+          'wt.exe',
+        ],
       },
       {
         name: 'PowerShell',
@@ -335,14 +341,36 @@ export class AppDetector {
 
     for (const app of AppDetector.windowsApps) {
       for (const exePath of app.exePaths) {
-        if (existsSync(exePath)) {
-          detected.push({
-            name: app.name,
-            bundleId: app.id,
-            category: app.category,
-            path: exePath,
-          });
-          break; // Found, no need to check other paths
+        // Check if it's an absolute path or a command name
+        const isAbsolutePath = exePath.includes('\\') || exePath.includes('/');
+
+        if (isAbsolutePath) {
+          if (existsSync(exePath)) {
+            detected.push({
+              name: app.name,
+              bundleId: app.id,
+              category: app.category,
+              path: exePath,
+            });
+            break;
+          }
+        } else {
+          // Use 'where' command to find executable in PATH
+          try {
+            const { stdout } = await execAsync(`where ${exePath}`, { timeout: 3000 });
+            const resolvedPath = stdout.trim().split('\n')[0];
+            if (resolvedPath) {
+              detected.push({
+                name: app.name,
+                bundleId: app.id,
+                category: app.category,
+                path: resolvedPath,
+              });
+              break;
+            }
+          } catch {
+            // Command not found, continue to next path
+          }
         }
       }
     }
@@ -414,12 +442,25 @@ export class AppDetector {
     }
 
     if (isWindows) {
-      // Windows: use Start-Process or direct exe path
-      const escapedPath = path.replace(/"/g, '`"');
-      const escapedExe = detectedApp.path.replace(/"/g, '`"');
-      await execAsync(
-        `powershell -Command "Start-Process '${escapedExe}' -ArgumentList '${escapedPath}'"`
-      );
+      const escapedExe = detectedApp.path.replace(/'/g, "''");
+      const escapedPath = path.replace(/'/g, "''");
+
+      if (bundleId === 'windows.terminal') {
+        // Windows Terminal uses -d flag for working directory
+        await execAsync(
+          `powershell -Command "Start-Process -FilePath '${escapedExe}' -ArgumentList '-d','${escapedPath}'"`
+        );
+      } else if (detectedApp.category === AppCategory.Terminal) {
+        // Other terminal apps: use -WorkingDirectory to open in the specified directory
+        await execAsync(
+          `powershell -Command "Start-Process -FilePath '${escapedExe}' -WorkingDirectory '${escapedPath}'"`
+        );
+      } else {
+        // Editors and other apps: pass path as argument
+        await execAsync(
+          `powershell -Command "Start-Process -FilePath '${escapedExe}' -ArgumentList '${escapedPath}'"`
+        );
+      }
     } else {
       // macOS: use open command
       await execAsync(`open -b "${bundleId}" "${path}"`);
