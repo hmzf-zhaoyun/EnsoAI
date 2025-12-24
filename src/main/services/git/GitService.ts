@@ -181,7 +181,14 @@ export class GitService {
   }
 
   async discard(filePath: string): Promise<void> {
-    // Validate path to prevent path traversal attacks
+    // 1. First check for symbolic links on the original path (before resolving)
+    const initialPath = path.join(this.workdir, filePath);
+    const initialStats = await fs.lstat(initialPath).catch(() => null);
+    if (initialStats?.isSymbolicLink()) {
+      throw new Error('Cannot discard symbolic links');
+    }
+
+    // 2. Then validate path to prevent path traversal attacks
     const absolutePath = path.resolve(this.workdir, filePath);
     const relativePath = path.relative(this.workdir, absolutePath);
 
@@ -189,14 +196,9 @@ export class GitService {
       throw new Error('Invalid file path: path traversal detected');
     }
 
-    // Check if file is untracked
+    // 3. Check if file is untracked and perform discard
     const status = await this.git.status();
     if (status.not_added.includes(filePath)) {
-      // Check for symbolic links
-      const stats = await fs.lstat(absolutePath);
-      if (stats.isSymbolicLink()) {
-        throw new Error('Cannot discard symbolic links');
-      }
       // Delete untracked file
       await fs.unlink(absolutePath);
     } else {

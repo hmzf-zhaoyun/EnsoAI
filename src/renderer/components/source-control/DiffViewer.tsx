@@ -314,15 +314,14 @@ export function DiffViewer({
   }, [file, navigateToDiff]);
 
   // Reset state when file changes
-  const prevFileRef = useRef(file?.path);
-  if (file?.path !== prevFileRef.current) {
-    prevFileRef.current = file?.path;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally trigger on file change
+  useEffect(() => {
     setCurrentDiffIndex(-1);
     setLineChanges([]);
     setBoundaryHint(null);
     decorationsRef.current = [];
     hasAutoNavigatedRef.current = false;
-  }
+  }, [file?.path, file?.staged]);
 
   if (!file) {
     return (
