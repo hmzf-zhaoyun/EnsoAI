@@ -1,4 +1,4 @@
-export type BuiltinAgentId = 'claude' | 'codex' | 'droid' | 'gemini' | 'auggie';
+export type BuiltinAgentId = 'claude' | 'codex' | 'droid' | 'gemini' | 'auggie' | 'cursor';
 
 export interface AgentCliInfo {
   id: string;

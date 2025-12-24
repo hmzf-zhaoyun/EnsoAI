@@ -50,6 +50,13 @@ const BUILTIN_AGENT_CONFIGS: BuiltinAgentConfig[] = [
     versionFlag: '--version',
     versionRegex: /(\d+\.\d+\.\d+)/,
   },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    command: 'cursor-agent',
+    versionFlag: '--version',
+    versionRegex: /(\d+\.\d+\.\d+)/,
+  },
 ];
 
 class CliDetector {

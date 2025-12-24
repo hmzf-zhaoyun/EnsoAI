@@ -48,6 +48,7 @@ const AGENT_INFO: Record<string, { name: string; command: string }> = {
   droid: { name: 'Droid', command: 'droid' },
   gemini: { name: 'Gemini', command: 'gemini' },
   auggie: { name: 'Auggie', command: 'auggie' },
+  cursor: { name: 'Cursor', command: 'cursor-agent' },
 };
 
 export function SessionBar({

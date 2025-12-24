@@ -86,7 +86,14 @@ export interface AgentConfig {
 
 export type AgentSettings = Record<string, AgentConfig>;
 
-export const BUILTIN_AGENT_IDS: BuiltinAgentId[] = ['claude', 'codex', 'droid', 'gemini', 'auggie'];
+export const BUILTIN_AGENT_IDS: BuiltinAgentId[] = [
+  'claude',
+  'codex',
+  'droid',
+  'gemini',
+  'auggie',
+  'cursor',
+];
 
 interface SettingsState {
   theme: Theme;
@@ -121,6 +128,7 @@ const defaultAgentSettings: AgentSettings = {
   droid: { enabled: true, isDefault: false },
   gemini: { enabled: true, isDefault: false },
   auggie: { enabled: true, isDefault: false },
+  cursor: { enabled: true, isDefault: false },
 };
 
 export const useSettingsStore = create<SettingsState>()(

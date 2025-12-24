@@ -39,6 +39,7 @@ Seamlessly switch between different AI coding agents:
 - **Claude** - Anthropic's AI assistant with session persistence
 - **Codex** - OpenAI's coding assistant
 - **Gemini** - Google's AI assistant
+- **Cursor** - Cursor's AI agent (`cursor-agent`)
 - **Droid** - Factory CLI for AI-powered CI/CD
 - **Auggie** - Augment Code's AI assistant
 
@@ -154,6 +155,7 @@ EnsoAI 是一款将 **Git Worktree 管理**与 **AI 编程助手**相结合的�
 - **Claude** - Anthropic 的 AI 助手，支持会话持久化
 - **Codex** - OpenAI 的编程助手
 - **Gemini** - Google 的 AI 助手
+- **Cursor** - Cursor 的 AI 助手 (`cursor-agent`)
 - **Droid** - Factory CLI，AI 驱动的 CI/CD 助手
 - **Auggie** - Augment Code 的 AI 助手
 

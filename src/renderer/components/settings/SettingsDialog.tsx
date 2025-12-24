@@ -452,9 +452,10 @@ const BUILTIN_AGENT_INFO: Record<BuiltinAgentId, { name: string; description: st
   droid: { name: 'Droid', description: 'Droid AI CLI' },
   gemini: { name: 'Gemini', description: 'Google Gemini CLI' },
   auggie: { name: 'Auggie', description: 'Augment Code CLI' },
+  cursor: { name: 'Cursor', description: 'Cursor Agent CLI' },
 };
 
-const BUILTIN_AGENTS: BuiltinAgentId[] = ['claude', 'codex', 'droid', 'gemini', 'auggie'];
+const BUILTIN_AGENTS: BuiltinAgentId[] = ['claude', 'codex', 'droid', 'gemini', 'auggie', 'cursor'];
 
 function AgentSettings() {
   const {
