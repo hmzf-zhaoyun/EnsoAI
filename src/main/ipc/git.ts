@@ -71,4 +71,11 @@ export function registerGitHandlers(): void {
       return git.getDiff(options);
     }
   );
+
+  ipcMain.handle(IPC_CHANNELS.GIT_INIT, async (_, workdir: string) => {
+    const git = getGitService(workdir);
+    await git.init();
+    // Clear the service cache after init to get fresh instance
+    gitServices.delete(workdir);
+  });
 }

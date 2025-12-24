@@ -157,3 +157,19 @@ export function useGitDiff(workdir: string | null, staged = false) {
     enabled: !!workdir,
   });
 }
+
+export function useGitInit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (workdir: string) => {
+      await window.electronAPI.git.init(workdir);
+    },
+    onSuccess: (_, workdir) => {
+      // Invalidate all git-related queries for this workdir
+      queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] });
+      queryClient.invalidateQueries({ queryKey: ['git', 'branches', workdir] });
+      queryClient.invalidateQueries({ queryKey: ['worktree', 'list', workdir] });
+    },
+  });
+}

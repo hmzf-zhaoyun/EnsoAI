@@ -1,8 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { FileCode, FolderOpen, GitBranch, Plus, Sparkles, Terminal } from 'lucide-react';
+import { FileCode, FolderOpen, GitBranch, GitCommit, Plus, Sparkles, Terminal } from 'lucide-react';
 import { OpenInMenu } from '@/components/app/OpenInMenu';
 import { AgentPanel } from '@/components/chat/AgentPanel';
 import { FilePanel } from '@/components/files';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
 import { TerminalPanel } from '../terminal';
 
@@ -129,9 +137,21 @@ export function MainContent({
           {repoPath && worktreePath ? (
             <AgentPanel repoPath={repoPath} cwd={worktreePath} isActive={activeTab === 'chat'} />
           ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              <p>请先选择一个 Worktree</p>
-            </div>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Sparkles className="h-4.5 w-4.5" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>开始使用 AI Agent</EmptyTitle>
+                <EmptyDescription>选择一个 Worktree 以开始使用 AI 编码助手</EmptyDescription>
+              </EmptyHeader>
+              {onExpandWorktree && worktreeCollapsed && (
+                <Button onClick={onExpandWorktree} variant="outline" className="mt-2">
+                  <GitBranch className="mr-2 h-4 w-4" />
+                  选择 Worktree
+                </Button>
+              )}
+            </Empty>
           )}
         </div>
         {/* Terminal tab - keep mounted to preserve shell sessions */}
@@ -150,8 +170,14 @@ export function MainContent({
 
 function SourceControlPlaceholder() {
   return (
-    <div className="flex h-full items-center justify-center text-muted-foreground">
-      <p>Source Control - Coming Soon</p>
-    </div>
+    <Empty>
+      <EmptyMedia variant="icon">
+        <GitCommit className="h-4.5 w-4.5" />
+      </EmptyMedia>
+      <EmptyHeader>
+        <EmptyTitle>源代码管理</EmptyTitle>
+        <EmptyDescription>此功能即将推出，敬请期待</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

@@ -7,6 +7,13 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import { useCallback, useEffect, useRef } from 'react';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { getXtermTheme, isTerminalThemeDark } from '@/lib/ghosttyTheme';
 import type { EditorTab, PendingCursor } from '@/stores/editor';
 import { useSettingsStore } from '@/stores/settings';
@@ -269,10 +276,15 @@ export function EditorArea({
             }}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-            <FileCode className="h-12 w-12 opacity-20" />
-            <p className="text-sm">Select a file to open</p>
-          </div>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <FileCode className="h-4.5 w-4.5" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>开始编辑</EmptyTitle>
+              <EmptyDescription>从左侧文件树中选择文件以开始编辑</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </div>

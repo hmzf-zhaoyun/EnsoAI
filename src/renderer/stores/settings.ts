@@ -95,6 +95,59 @@ export const BUILTIN_AGENT_IDS: BuiltinAgentId[] = [
   'cursor',
 ];
 
+// Terminal keybindings
+export interface TerminalKeybinding {
+  key: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  meta?: boolean;
+}
+
+export interface TerminalKeybindings {
+  clear: TerminalKeybinding;
+  newTab: TerminalKeybinding;
+  closeTab: TerminalKeybinding;
+  nextTab: TerminalKeybinding;
+  prevTab: TerminalKeybinding;
+}
+
+// Main tab switching keybindings
+export interface MainTabKeybindings {
+  switchToAgent: TerminalKeybinding;
+  switchToFile: TerminalKeybinding;
+  switchToTerminal: TerminalKeybinding;
+}
+
+// Agent session keybindings
+export interface AgentKeybindings {
+  newSession: TerminalKeybinding;
+  closeSession: TerminalKeybinding;
+  nextSession: TerminalKeybinding;
+  prevSession: TerminalKeybinding;
+}
+
+export const defaultTerminalKeybindings: TerminalKeybindings = {
+  clear: { key: 'r', meta: true }, // Cmd/Win+R
+  newTab: { key: 't', ctrl: true },
+  closeTab: { key: 'w', ctrl: true },
+  nextTab: { key: ']', ctrl: true },
+  prevTab: { key: '[', ctrl: true },
+};
+
+export const defaultMainTabKeybindings: MainTabKeybindings = {
+  switchToAgent: { key: '1', ctrl: true }, // Ctrl+1
+  switchToFile: { key: '2', ctrl: true }, // Ctrl+2
+  switchToTerminal: { key: '3', ctrl: true }, // Ctrl+3
+};
+
+export const defaultAgentKeybindings: AgentKeybindings = {
+  newSession: { key: 't', meta: true, shift: true }, // Cmd/Win+Shift+T
+  closeSession: { key: 'w', meta: true, shift: true }, // Cmd/Win+Shift+W
+  nextSession: { key: ']', meta: true }, // Cmd/Win+]
+  prevSession: { key: '[', meta: true }, // Cmd/Win+[
+};
+
 interface SettingsState {
   theme: Theme;
   fontSize: number;
@@ -104,6 +157,9 @@ interface SettingsState {
   terminalFontWeight: FontWeight;
   terminalFontWeightBold: FontWeight;
   terminalTheme: string;
+  terminalKeybindings: TerminalKeybindings;
+  mainTabKeybindings: MainTabKeybindings;
+  agentKeybindings: AgentKeybindings;
   agentSettings: AgentSettings;
   customAgents: CustomAgent[];
 
@@ -115,6 +171,9 @@ interface SettingsState {
   setTerminalFontWeight: (weight: FontWeight) => void;
   setTerminalFontWeightBold: (weight: FontWeight) => void;
   setTerminalTheme: (theme: string) => void;
+  setTerminalKeybindings: (keybindings: TerminalKeybindings) => void;
+  setMainTabKeybindings: (keybindings: MainTabKeybindings) => void;
+  setAgentKeybindings: (keybindings: AgentKeybindings) => void;
   setAgentEnabled: (agentId: string, enabled: boolean) => void;
   setAgentDefault: (agentId: string) => void;
   addCustomAgent: (agent: CustomAgent) => void;
@@ -142,6 +201,9 @@ export const useSettingsStore = create<SettingsState>()(
       terminalFontWeight: 'normal',
       terminalFontWeightBold: '500',
       terminalTheme: 'Dracula',
+      terminalKeybindings: defaultTerminalKeybindings,
+      mainTabKeybindings: defaultMainTabKeybindings,
+      agentKeybindings: defaultAgentKeybindings,
       agentSettings: defaultAgentSettings,
       customAgents: [],
 
@@ -174,6 +236,9 @@ export const useSettingsStore = create<SettingsState>()(
         }
         set({ terminalTheme });
       },
+      setTerminalKeybindings: (terminalKeybindings) => set({ terminalKeybindings }),
+      setMainTabKeybindings: (mainTabKeybindings) => set({ mainTabKeybindings }),
+      setAgentKeybindings: (agentKeybindings) => set({ agentKeybindings }),
       setAgentEnabled: (agentId, enabled) => {
         const current = get().agentSettings;
         set({

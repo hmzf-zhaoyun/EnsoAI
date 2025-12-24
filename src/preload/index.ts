@@ -40,6 +40,7 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_PULL, workdir, remote, branch),
     getDiff: (workdir: string, options?: { staged?: boolean }): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_DIFF, workdir, options),
+    init: (workdir: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.GIT_INIT, workdir),
   },
 
   // Worktree

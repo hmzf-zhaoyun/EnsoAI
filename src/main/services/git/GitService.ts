@@ -76,4 +76,8 @@ export class GitService {
     }
     return this.git.diff();
   }
+
+  async init(): Promise<void> {
+    await this.git.init();
+  }
 }

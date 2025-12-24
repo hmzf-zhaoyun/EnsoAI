@@ -4,16 +4,26 @@ import { useWorktreeStore } from '@/stores/worktree';
 
 export function useWorktreeList(workdir: string | null) {
   const setWorktrees = useWorktreeStore((s) => s.setWorktrees);
+  const setError = useWorktreeStore((s) => s.setError);
 
   return useQuery({
     queryKey: ['worktree', 'list', workdir],
     queryFn: async () => {
       if (!workdir) return [];
-      const worktrees = await window.electronAPI.worktree.list(workdir);
-      setWorktrees(worktrees);
-      return worktrees;
+      try {
+        const worktrees = await window.electronAPI.worktree.list(workdir);
+        setWorktrees(worktrees);
+        setError(null);
+        return worktrees;
+      } catch (error) {
+        // Handle not a git repository error
+        setError(error instanceof Error ? error.message : 'Failed to load worktrees');
+        setWorktrees([]);
+        return [];
+      }
     },
     enabled: !!workdir,
+    retry: false, // Don't retry on git errors
   });
 }
 

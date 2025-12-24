@@ -3,6 +3,7 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  Keyboard,
   Monitor,
   Moon,
   Palette,
@@ -13,6 +14,7 @@ import {
   Sun,
   Terminal,
   Trash2,
+  X,
 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -40,12 +42,18 @@ import {
   type XtermTheme,
 } from '@/lib/ghosttyTheme';
 import { cn } from '@/lib/utils';
-import { type FontWeight, type Theme, useSettingsStore } from '@/stores/settings';
+import {
+  type FontWeight,
+  type TerminalKeybinding,
+  type Theme,
+  useSettingsStore,
+} from '@/stores/settings';
 
-type SettingsCategory = 'appearance' | 'agent';
+type SettingsCategory = 'appearance' | 'keybindings' | 'agent';
 
 const categories: Array<{ id: SettingsCategory; icon: React.ElementType; label: string }> = [
   { id: 'appearance', icon: Palette, label: '外观' },
+  { id: 'keybindings', icon: Keyboard, label: '快捷键' },
   { id: 'agent', icon: Bot, label: 'Agent' },
 ];
 
@@ -102,6 +110,7 @@ export function SettingsDialog({ trigger, open, onOpenChange }: SettingsDialogPr
           {/* Right: Settings Panel */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeCategory === 'appearance' && <AppearanceSettings />}
+            {activeCategory === 'keybindings' && <KeybindingsSettings />}
             {activeCategory === 'agent' && <AgentSettings />}
           </div>
         </div>
@@ -128,15 +137,50 @@ function AppearanceSettings() {
     setTheme,
     terminalTheme,
     setTerminalTheme,
-    terminalFontSize,
+    terminalFontSize: globalFontSize,
     setTerminalFontSize,
-    terminalFontFamily,
+    terminalFontFamily: globalFontFamily,
     setTerminalFontFamily,
     terminalFontWeight,
     setTerminalFontWeight,
     terminalFontWeightBold,
     setTerminalFontWeightBold,
   } = useSettingsStore();
+
+  // Local state for inputs
+  const [localFontSize, setLocalFontSize] = React.useState(globalFontSize);
+  const [localFontFamily, setLocalFontFamily] = React.useState(globalFontFamily);
+
+  // Sync local state with global when global changes externally
+  React.useEffect(() => {
+    setLocalFontSize(globalFontSize);
+  }, [globalFontSize]);
+
+  React.useEffect(() => {
+    setLocalFontFamily(globalFontFamily);
+  }, [globalFontFamily]);
+
+  // Apply font size change (with validation)
+  const applyFontSizeChange = React.useCallback(() => {
+    const validFontSize = Math.max(8, Math.min(32, localFontSize || 8));
+    if (validFontSize !== localFontSize) {
+      setLocalFontSize(validFontSize);
+    }
+    if (validFontSize !== globalFontSize) {
+      setTerminalFontSize(validFontSize);
+    }
+  }, [localFontSize, globalFontSize, setTerminalFontSize]);
+
+  // Apply font family change (with validation)
+  const applyFontFamilyChange = React.useCallback(() => {
+    const validFontFamily = localFontFamily.trim() || globalFontFamily;
+    if (validFontFamily !== localFontFamily) {
+      setLocalFontFamily(validFontFamily);
+    }
+    if (validFontFamily !== globalFontFamily) {
+      setTerminalFontFamily(validFontFamily);
+    }
+  }, [localFontFamily, globalFontFamily, setTerminalFontFamily]);
 
   // Get theme names synchronously from embedded data
   const themeNames = React.useMemo(() => getThemeNames(), []);
@@ -214,8 +258,8 @@ function AppearanceSettings() {
         <p className="text-sm font-medium">预览</p>
         <TerminalPreview
           theme={previewTheme}
-          fontSize={terminalFontSize}
-          fontFamily={terminalFontFamily}
+          fontSize={localFontSize}
+          fontFamily={localFontFamily}
           fontWeight={terminalFontWeight}
         />
       </div>
@@ -244,8 +288,15 @@ function AppearanceSettings() {
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
         <span className="text-sm font-medium">字体</span>
         <Input
-          value={terminalFontFamily}
-          onChange={(e) => setTerminalFontFamily(e.target.value)}
+          value={localFontFamily}
+          onChange={(e) => setLocalFontFamily(e.target.value)}
+          onBlur={applyFontFamilyChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              applyFontFamilyChange();
+              e.currentTarget.blur();
+            }
+          }}
           placeholder="JetBrains Mono, monospace"
         />
       </div>
@@ -256,8 +307,15 @@ function AppearanceSettings() {
         <div className="flex items-center gap-2">
           <Input
             type="number"
-            value={terminalFontSize}
-            onChange={(e) => setTerminalFontSize(Number(e.target.value))}
+            value={localFontSize}
+            onChange={(e) => setLocalFontSize(Number(e.target.value))}
+            onBlur={applyFontSizeChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                applyFontSizeChange();
+                e.currentTarget.blur();
+              }
+            }}
             min={8}
             max={32}
             className="w-20"
@@ -443,6 +501,229 @@ function ThemeCombobox({
         </ComboboxList>
       </ComboboxPopup>
     </Combobox>
+  );
+}
+
+// KeybindingInput component for capturing keyboard shortcuts
+function KeybindingInput({
+  value,
+  onChange,
+}: {
+  value: TerminalKeybinding;
+  onChange: (binding: TerminalKeybinding) => void;
+}) {
+  const [isRecording, setIsRecording] = React.useState(false);
+
+  const formatKeybinding = (binding: TerminalKeybinding): string => {
+    const parts: string[] = [];
+    if (binding.ctrl) parts.push('Ctrl');
+    if (binding.alt) parts.push('Alt');
+    if (binding.shift) parts.push('Shift');
+    if (binding.meta) parts.push('Cmd');
+    parts.push(binding.key.toUpperCase());
+    return parts.join(' + ');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isRecording) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Ignore modifier-only keys
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+
+    // Record exactly what the user pressed
+    const newBinding: TerminalKeybinding = {
+      key: e.key.toLowerCase(),
+    };
+
+    // Only set modifier keys if they are actually pressed
+    if (e.ctrlKey && !e.metaKey) newBinding.ctrl = true;
+    if (e.altKey) newBinding.alt = true;
+    if (e.shiftKey) newBinding.shift = true;
+    if (e.metaKey) newBinding.meta = true;
+
+    onChange(newBinding);
+    setIsRecording(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={cn(
+          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+          'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
+          isRecording && 'ring-2 ring-ring ring-offset-2'
+        )}
+        onClick={() => setIsRecording(true)}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+      >
+        {isRecording ? (
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Keyboard className="h-4 w-4" />
+            按下快捷键...
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Keyboard className="h-4 w-4" />
+            {formatKeybinding(value)}
+          </span>
+        )}
+      </div>
+      {isRecording && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsRecording(false);
+          }}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// Keybindings Settings Component
+function KeybindingsSettings() {
+  const {
+    terminalKeybindings,
+    setTerminalKeybindings,
+    mainTabKeybindings,
+    setMainTabKeybindings,
+    agentKeybindings,
+    setAgentKeybindings,
+  } = useSettingsStore();
+
+  return (
+    <div className="space-y-6">
+      {/* Main Tab Switching */}
+      <div>
+        <h3 className="text-lg font-medium">主标签切换</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          设置全局主标签切换快捷键 (macOS 上是 Cmd,Windows 上是 Win 键)
+        </p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">切换到 Agent</span>
+            <KeybindingInput
+              value={mainTabKeybindings.switchToAgent}
+              onChange={(binding) => {
+                setMainTabKeybindings({
+                  ...mainTabKeybindings,
+                  switchToAgent: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">切换到 File</span>
+            <KeybindingInput
+              value={mainTabKeybindings.switchToFile}
+              onChange={(binding) => {
+                setMainTabKeybindings({
+                  ...mainTabKeybindings,
+                  switchToFile: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">切换到 Terminal</span>
+            <KeybindingInput
+              value={mainTabKeybindings.switchToTerminal}
+              onChange={(binding) => {
+                setMainTabKeybindings({
+                  ...mainTabKeybindings,
+                  switchToTerminal: binding,
+                });
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Agent Session Management */}
+      <div className="border-t pt-6">
+        <h3 className="text-lg font-medium">Agent Session</h3>
+        <p className="text-sm text-muted-foreground mb-4">设置 Agent session 管理快捷键</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">新建 Session</span>
+            <KeybindingInput
+              value={agentKeybindings.newSession}
+              onChange={(binding) => {
+                setAgentKeybindings({
+                  ...agentKeybindings,
+                  newSession: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">关闭 Session</span>
+            <KeybindingInput
+              value={agentKeybindings.closeSession}
+              onChange={(binding) => {
+                setAgentKeybindings({
+                  ...agentKeybindings,
+                  closeSession: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">下一个 Session</span>
+            <KeybindingInput
+              value={agentKeybindings.nextSession}
+              onChange={(binding) => {
+                setAgentKeybindings({
+                  ...agentKeybindings,
+                  nextSession: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">上一个 Session</span>
+            <KeybindingInput
+              value={agentKeybindings.prevSession}
+              onChange={(binding) => {
+                setAgentKeybindings({
+                  ...agentKeybindings,
+                  prevSession: binding,
+                });
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Terminal Shortcuts */}
+      <div className="border-t pt-6">
+        <h3 className="text-lg font-medium">终端</h3>
+        <p className="text-sm text-muted-foreground mb-4">设置终端快捷键</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">清除终端</span>
+            <KeybindingInput
+              value={terminalKeybindings.clear}
+              onChange={(binding) => {
+                setTerminalKeybindings({
+                  ...terminalKeybindings,
+                  clear: binding,
+                });
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

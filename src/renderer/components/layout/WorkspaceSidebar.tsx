@@ -10,6 +10,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
 
 interface Repository {
@@ -102,9 +109,29 @@ export function WorkspaceSidebar({
       {/* Repository List */}
       <div className="flex-1 overflow-auto p-2">
         {filteredRepos.length === 0 && searchQuery ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">没有找到匹配的仓库</div>
+          <Empty className="border-0">
+            <EmptyMedia variant="icon">
+              <Search className="h-4.5 w-4.5" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle className="text-base">未找到仓库</EmptyTitle>
+              <EmptyDescription>尝试使用不同的关键词搜索</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : repositories.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">点击 + 添加仓库</div>
+          <Empty className="border-0">
+            <EmptyMedia variant="icon">
+              <FolderGit2 className="h-4.5 w-4.5" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle className="text-base">添加仓库</EmptyTitle>
+              <EmptyDescription>从本地文件夹添加 Git 仓库开始使用</EmptyDescription>
+            </EmptyHeader>
+            <Button onClick={onAddRepository} variant="outline" className="mt-2">
+              <Plus className="mr-2 h-4 w-4" />
+              添加仓库
+            </Button>
+          </Empty>
         ) : (
           <div className="space-y-1">
             {filteredRepos.map((repo) => (

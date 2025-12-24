@@ -100,7 +100,7 @@ function saveSessions(
 }
 
 export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps) {
-  const { agentSettings, customAgents } = useSettingsStore();
+  const { agentSettings, customAgents, agentKeybindings } = useSettingsStore();
   const defaultAgentId = useMemo(() => getDefaultAgentId(agentSettings), [agentSettings]);
 
   const [state, setState] = useState(() => {
@@ -200,6 +200,26 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
     });
   }, []);
 
+  const handleNextSession = useCallback(() => {
+    setState((prev) => {
+      const sessions = prev.sessions.filter((s) => s.cwd === cwd);
+      if (sessions.length <= 1) return prev;
+      const currentIndex = sessions.findIndex((s) => s.id === prev.activeIds[cwd]);
+      const nextIndex = (currentIndex + 1) % sessions.length;
+      return { ...prev, activeIds: { ...prev.activeIds, [cwd]: sessions[nextIndex].id } };
+    });
+  }, [cwd]);
+
+  const handlePrevSession = useCallback(() => {
+    setState((prev) => {
+      const sessions = prev.sessions.filter((s) => s.cwd === cwd);
+      if (sessions.length <= 1) return prev;
+      const currentIndex = sessions.findIndex((s) => s.id === prev.activeIds[cwd]);
+      const prevIndex = currentIndex <= 0 ? sessions.length - 1 : currentIndex - 1;
+      return { ...prev, activeIds: { ...prev.activeIds, [cwd]: sessions[prevIndex].id } };
+    });
+  }, [cwd]);
+
   const handleInitialized = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
@@ -237,26 +257,66 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
     [cwd, customAgents]
   );
 
-  // Cmd+T: new session, Cmd+W: close session, Cmd+1-9: switch session
+  // Check if a keyboard event matches a keybinding
+  const matchesKeybinding = useCallback(
+    (
+      e: KeyboardEvent,
+      binding: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean; meta?: boolean }
+    ) => {
+      const keyMatch = e.key.toLowerCase() === binding.key.toLowerCase();
+      const ctrlMatch = binding.ctrl !== undefined ? e.ctrlKey === binding.ctrl : true;
+      const altMatch = binding.alt !== undefined ? e.altKey === binding.alt : true;
+      const shiftMatch = binding.shift !== undefined ? e.shiftKey === binding.shift : true;
+      const metaMatch = binding.meta !== undefined ? e.metaKey === binding.meta : true;
+
+      return keyMatch && ctrlMatch && altMatch && shiftMatch && metaMatch;
+    },
+    []
+  );
+
+  // Agent session keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isActive) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+
+      // New session
+      if (matchesKeybinding(e, agentKeybindings.newSession)) {
         e.preventDefault();
         handleNewSession();
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+
+      // Close session
+      if (matchesKeybinding(e, agentKeybindings.closeSession)) {
         e.preventDefault();
         if (activeSessionId) {
           handleCloseSession(activeSessionId);
         }
+        return;
       }
-      // Cmd+1-9 to switch sessions
-      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+
+      // Next session
+      if (matchesKeybinding(e, agentKeybindings.nextSession)) {
         e.preventDefault();
+        handleNextSession();
+        return;
+      }
+
+      // Prev session
+      if (matchesKeybinding(e, agentKeybindings.prevSession)) {
+        e.preventDefault();
+        handlePrevSession();
+        return;
+      }
+
+      // Bonus: Cmd/Win+1-9 to switch to specific session (if not intercepted by main tab)
+      if (e.metaKey && e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        const sessions = allSessions.filter((s) => s.cwd === cwd);
         const index = Number.parseInt(e.key, 10) - 1;
-        if (index < currentWorktreeSessions.length) {
-          handleSelectSession(currentWorktreeSessions[index].id);
+        if (index < sessions.length) {
+          e.preventDefault();
+          handleSelectSession(sessions[index].id);
+          return;
         }
       }
     };
@@ -265,9 +325,14 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
   }, [
     isActive,
     activeSessionId,
-    currentWorktreeSessions,
+    agentKeybindings,
+    matchesKeybinding,
     handleNewSession,
     handleCloseSession,
+    handleNextSession,
+    handlePrevSession,
+    allSessions,
+    cwd,
     handleSelectSession,
   ]);
 

@@ -9,6 +9,7 @@ export const IPC_CHANNELS = {
   GIT_BRANCH_CHECKOUT: 'git:branch:checkout',
   GIT_LOG: 'git:log',
   GIT_DIFF: 'git:diff',
+  GIT_INIT: 'git:init',
 
   // Worktree
   WORKTREE_LIST: 'worktree:list',

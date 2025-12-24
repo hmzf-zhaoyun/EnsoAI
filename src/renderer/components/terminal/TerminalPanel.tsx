@@ -1,6 +1,7 @@
 import { List, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/settings';
 import { ShellTerminal } from './ShellTerminal';
 
 interface TerminalTab {
@@ -38,6 +39,7 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const terminalKeybindings = useSettingsStore((state) => state.terminalKeybindings);
 
   // Create initial tab when cwd becomes available
   useEffect(() => {
@@ -99,32 +101,100 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     setState((prev) => ({ ...prev, activeId: id }));
   }, []);
 
-  // Cmd+T: new tab, Cmd+W: close tab, Cmd+1-9: switch tab
+  const handleNextTab = useCallback(() => {
+    setState((prev) => {
+      if (prev.tabs.length <= 1) return prev;
+      const currentIndex = prev.tabs.findIndex((t) => t.id === prev.activeId);
+      const nextIndex = (currentIndex + 1) % prev.tabs.length;
+      return { ...prev, activeId: prev.tabs[nextIndex].id };
+    });
+  }, []);
+
+  const handlePrevTab = useCallback(() => {
+    setState((prev) => {
+      if (prev.tabs.length <= 1) return prev;
+      const currentIndex = prev.tabs.findIndex((t) => t.id === prev.activeId);
+      const prevIndex = currentIndex <= 0 ? prev.tabs.length - 1 : currentIndex - 1;
+      return { ...prev, activeId: prev.tabs[prevIndex].id };
+    });
+  }, []);
+
+  // Check if a keyboard event matches a keybinding
+  const matchesKeybinding = useCallback(
+    (
+      e: KeyboardEvent,
+      binding: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean; meta?: boolean }
+    ) => {
+      const keyMatch = e.key.toLowerCase() === binding.key.toLowerCase();
+      const ctrlMatch = binding.ctrl !== undefined ? e.ctrlKey === binding.ctrl : true;
+      const altMatch = binding.alt !== undefined ? e.altKey === binding.alt : true;
+      const shiftMatch = binding.shift !== undefined ? e.shiftKey === binding.shift : true;
+      const metaMatch = binding.meta !== undefined ? e.metaKey === binding.meta : true;
+
+      return keyMatch && ctrlMatch && altMatch && shiftMatch && metaMatch;
+    },
+    []
+  );
+
+  // Terminal tab keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isActive) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+
+      // New tab
+      if (matchesKeybinding(e, terminalKeybindings.newTab)) {
         e.preventDefault();
         handleNewTab();
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+
+      // Close tab
+      if (matchesKeybinding(e, terminalKeybindings.closeTab)) {
         e.preventDefault();
         if (activeId) {
           handleCloseTab(activeId);
         }
+        return;
       }
-      // Cmd+1-9 to switch tabs
+
+      // Next tab
+      if (matchesKeybinding(e, terminalKeybindings.nextTab)) {
+        e.preventDefault();
+        handleNextTab();
+        return;
+      }
+
+      // Prev tab
+      if (matchesKeybinding(e, terminalKeybindings.prevTab)) {
+        e.preventDefault();
+        handlePrevTab();
+        return;
+      }
+
+      // Cmd+1-9 to switch tabs (keep this as a bonus feature)
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
         const index = Number.parseInt(e.key, 10) - 1;
         if (index < tabs.length) {
           handleSelectTab(tabs[index].id);
         }
+        return;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, activeId, tabs, handleNewTab, handleCloseTab, handleSelectTab]);
+  }, [
+    isActive,
+    activeId,
+    tabs,
+    terminalKeybindings,
+    matchesKeybinding,
+    handleNewTab,
+    handleCloseTab,
+    handleNextTab,
+    handlePrevTab,
+    handleSelectTab,
+  ]);
 
   const handleStartEdit = useCallback((tab: TerminalTab) => {
     setEditingId(tab.id);
