@@ -45,11 +45,15 @@ function createSession(
   agentId: string,
   customAgents: Array<{ id: string; name: string; command: string }>
 ): Session {
+  // Handle WSL agent IDs (e.g., 'codex-wsl' -> base is 'codex')
+  const isWsl = agentId.endsWith('-wsl');
+  const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+
   // Check if it's a custom agent
-  const customAgent = customAgents.find((a) => a.id === agentId);
+  const customAgent = customAgents.find((a) => a.id === baseId);
   const info = customAgent
     ? { name: customAgent.name, command: customAgent.command }
-    : AGENT_INFO[agentId] || { name: 'Claude', command: 'claude' };
+    : AGENT_INFO[baseId] || { name: 'Claude', command: 'claude' };
 
   return {
     id: crypto.randomUUID(),
@@ -58,6 +62,7 @@ function createSession(
     agentCommand: info.command,
     initialized: false,
     cwd,
+    environment: isWsl ? 'wsl' : 'native',
   };
 }
 
@@ -236,9 +241,13 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
 
   const handleNewSessionWithAgent = useCallback(
     (agentId: string, agentCommand: string) => {
+      // Handle WSL agent IDs (e.g., 'codex-wsl' -> base is 'codex')
+      const isWsl = agentId.endsWith('-wsl');
+      const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+
       // Get agent name for display
-      const customAgent = customAgents.find((a) => a.id === agentId);
-      const name = customAgent?.name ?? AGENT_INFO[agentId]?.name ?? 'Agent';
+      const customAgent = customAgents.find((a) => a.id === baseId);
+      const name = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? 'Agent';
 
       const newSession: Session = {
         id: crypto.randomUUID(),
@@ -247,6 +256,7 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
         agentCommand,
         initialized: false,
         cwd,
+        environment: isWsl ? 'wsl' : 'native',
       };
 
       setState((prev) => ({
@@ -353,6 +363,7 @@ export function AgentPanel({ repoPath, cwd, isActive = false }: AgentPanelProps)
               cwd={session.cwd}
               sessionId={session.id}
               agentCommand={session.agentCommand || 'claude'}
+              environment={session.environment || 'native'}
               initialized={session.initialized}
               isActive={isSessionActive}
               onInitialized={() => handleInitialized(session.id)}

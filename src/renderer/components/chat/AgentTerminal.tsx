@@ -9,6 +9,7 @@ interface AgentTerminalProps {
   cwd?: string;
   sessionId?: string;
   agentCommand?: string;
+  environment?: 'native' | 'wsl';
   initialized?: boolean;
   isActive?: boolean;
   onInitialized?: () => void;
@@ -21,6 +22,7 @@ export function AgentTerminal({
   cwd,
   sessionId,
   agentCommand = 'claude',
+  environment = 'native',
   initialized,
   isActive = false,
   onInitialized,
@@ -42,6 +44,18 @@ export function AgentTerminal({
     const fullCommand = `${agentCommand} ${agentArgs.join(' ')}`.trim();
 
     const isWindows = window.electronAPI?.env?.platform === 'win32';
+
+    // WSL environment: run through WSL with interactive login shell
+    if (environment === 'wsl' && isWindows) {
+      // Use $SHELL -ilc to load nvm/rbenv and respect user's default shell
+      const wslCommand = `exec $SHELL -ilc "${fullCommand}"`;
+      return {
+        shell: 'wsl.exe',
+        args: ['--', 'sh', '-c', wslCommand],
+      };
+    }
+
+    // Native Windows
     if (isWindows) {
       return {
         shell: 'powershell.exe',
@@ -49,11 +63,12 @@ export function AgentTerminal({
       };
     }
 
+    // Native Unix
     return {
       shell: '/bin/zsh',
       args: ['-i', '-l', '-c', fullCommand],
     };
-  }, [agentCommand, sessionId, initialized]);
+  }, [agentCommand, sessionId, initialized, environment]);
 
   // Handle exit with auto-close logic
   const handleExit = useCallback(() => {

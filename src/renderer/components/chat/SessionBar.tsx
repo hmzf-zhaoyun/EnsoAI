@@ -10,10 +10,11 @@ const LONG_PRESS_DELAY = 500; // ms for long press detection
 export interface Session {
   id: string; // UUID, also used for agent --session-id
   name: string;
-  agentId: string; // which agent CLI to use (e.g., 'claude', 'codex', 'gemini')
+  agentId: string; // which agent CLI to use (e.g., 'claude', 'codex', 'gemini', 'codex-wsl')
   agentCommand: string; // the CLI command to run (e.g., 'claude', 'codex')
   initialized: boolean; // true after first run, use --resume to restore
   cwd: string; // worktree path this session belongs to
+  environment?: 'native' | 'wsl'; // execution environment (default: native)
 }
 
 interface SessionBarProps {
@@ -75,26 +76,25 @@ export function SessionBar({
   // Get enabled agents from settings
   const { agentSettings, customAgents } = useSettingsStore();
 
-  // Detect installed agents on mount
+  // Detect installed agents on mount (including WSL variants)
   useEffect(() => {
-    for (const agentId of BUILTIN_AGENT_IDS) {
-      window.electronAPI.cli.detectOne(agentId).then((result) => {
+    // Get all enabled agent IDs from settings (includes WSL variants like 'codex-wsl')
+    const enabledAgentIds = Object.keys(agentSettings).filter((id) => agentSettings[id]?.enabled);
+
+    for (const agentId of enabledAgentIds) {
+      // Find custom agent if this is a custom agent ID
+      const customAgent = customAgents.find((a) => a.id === agentId || `${a.id}-wsl` === agentId);
+
+      window.electronAPI.cli.detectOne(agentId, customAgent).then((result) => {
         if (result.installed) {
           setInstalledAgents((prev) => new Set([...prev, agentId]));
         }
       });
     }
-    for (const agent of customAgents) {
-      window.electronAPI.cli.detectOne(agent.id, agent).then((result) => {
-        if (result.installed) {
-          setInstalledAgents((prev) => new Set([...prev, agent.id]));
-        }
-      });
-    }
-  }, [customAgents]);
+  }, [agentSettings, customAgents]);
 
-  // Filter to only enabled AND installed agents
-  const enabledAgents = [...BUILTIN_AGENT_IDS, ...customAgents.map((a) => a.id)].filter(
+  // Filter to only enabled AND installed agents (includes WSL variants)
+  const enabledAgents = Object.keys(agentSettings).filter(
     (id) => agentSettings[id]?.enabled && installedAgents.has(id)
   );
 
@@ -231,10 +231,14 @@ export function SessionBar({
 
   const handleSelectAgent = useCallback(
     (agentId: string) => {
-      const customAgent = customAgents.find((a) => a.id === agentId);
+      // Handle WSL agent IDs (e.g., 'codex-wsl' -> base is 'codex')
+      const isWsl = agentId.endsWith('-wsl');
+      const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+
+      const customAgent = customAgents.find((a) => a.id === baseId);
       const info = customAgent
         ? { name: customAgent.name, command: customAgent.command }
-        : AGENT_INFO[agentId] || { name: 'Claude', command: 'claude' };
+        : AGENT_INFO[baseId] || { name: 'Claude', command: 'claude' };
 
       onNewSessionWithAgent?.(agentId, info.command);
       setShowAgentMenu(false);
@@ -361,8 +365,11 @@ export function SessionBar({
                   <div className="absolute top-full right-0 mt-1 z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg">
                     <div className="px-2 py-1 text-xs text-muted-foreground">选择 Agent</div>
                     {enabledAgents.map((agentId) => {
-                      const customAgent = customAgents.find((a) => a.id === agentId);
-                      const name = customAgent?.name ?? AGENT_INFO[agentId]?.name ?? agentId;
+                      const isWsl = agentId.endsWith('-wsl');
+                      const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+                      const customAgent = customAgents.find((a) => a.id === baseId);
+                      const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
+                      const name = isWsl ? `${baseName} (WSL)` : baseName;
                       const isDefault = agentSettings[agentId]?.isDefault;
                       return (
                         <button
