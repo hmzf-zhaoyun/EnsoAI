@@ -12,6 +12,9 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
 
     steps:
       - name: Checkout
@@ -41,8 +44,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build macOS (arm64 + x64)
-        run: pnpm build:mac
+      - name: Build macOS (${{ matrix.arch }})
+        run: pnpm build && npx electron-builder --mac --${{ matrix.arch }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --max-old-space-size=4096
@@ -50,10 +53,12 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-build
+          name: macos-${{ matrix.arch }}
           path: |
             dist/*.dmg
             dist/*.zip
+            dist/*.blockmap
+            dist/*.yml
           retention-days: 7
 
       - name: Upload to Release
@@ -63,5 +68,7 @@ jobs:
           files: |
             dist/*.dmg
             dist/*.zip
+            dist/*.blockmap
+            dist/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
