@@ -132,6 +132,12 @@ function readStoredLanguage(): Locale {
   return 'en';
 }
 
+// Linux: avoid GTK3/GTK4 mixed symbols crash by forcing GTK3 unless explicitly overridden.
+if (process.platform === 'linux') {
+  const gtkVersion = process.env.ENSOAI_GTK_VERSION || '3';
+  app.commandLine.appendSwitch('gtk-version', gtkVersion);
+}
+
 async function init(): Promise<void> {
   // Check Git installation
   const gitInstalled = await checkGitInstalled();
