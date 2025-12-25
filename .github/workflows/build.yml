@@ -10,22 +10,11 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-mac:
     strategy:
       matrix:
-        include:
-          - os: macos-latest
-            platform: mac
-            arch: arm64
-          - os: macos-latest
-            platform: mac
-            arch: x64
-          - os: windows-latest
-            platform: win
-            arch: x64
-
-    runs-on: ${{ matrix.os }}
-
+        arch: [arm64, x64]
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,22 +29,20 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          restore-keys: ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build && npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }}
+      - name: Build macOS (${{ matrix.arch }})
+        run: pnpm build && npx electron-builder --mac --${{ matrix.arch }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --max-old-space-size=4096
@@ -63,18 +50,69 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            dist/*.dmg
-            dist/*.exe
+          name: mac-${{ matrix.arch }}
+          path: dist/*.dmg
           retention-days: 7
 
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows
+        run: pnpm build && npx electron-builder --win --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/*.exe
+          retention-days: 7
+
+  release:
+    needs: [build-mac, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
       - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*.dmg
-            dist/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
