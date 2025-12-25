@@ -3,6 +3,7 @@ import {
   ExternalLink,
   FolderOpen,
   GitBranch,
+  Loader2,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -111,6 +112,8 @@ interface ActionItem {
   icon: React.ElementType;
   shortcut?: string;
   action: () => void;
+  disabled?: boolean;
+  loading?: boolean;
 }
 
 interface ActionGroup {
@@ -172,9 +175,19 @@ export function ActionPanel({
           // CLI install/uninstall action
           {
             id: 'cli-install',
-            label: cliStatus?.installed ? "卸载 'enso' 命令" : "安装 'enso' 命令到 PATH",
-            icon: Terminal,
+            label:
+              cliInstall.isPending || cliUninstall.isPending
+                ? cliStatus?.installed
+                  ? '正在卸载...'
+                  : '正在安装...'
+                : cliStatus?.installed
+                  ? "卸载 'enso' 命令"
+                  : "安装 'enso' 命令到 PATH",
+            icon: cliInstall.isPending || cliUninstall.isPending ? Loader2 : Terminal,
+            loading: cliInstall.isPending || cliUninstall.isPending,
+            disabled: cliInstall.isPending || cliUninstall.isPending,
             action: async () => {
+              if (cliInstall.isPending || cliUninstall.isPending) return;
               // Re-check status at execution time
               const status = await window.electronAPI.cli.getInstallStatus();
               if (status.installed) {
@@ -322,16 +335,18 @@ export function ActionPanel({
                         key={item.id}
                         type="button"
                         data-action-index={currentIndex}
+                        disabled={item.disabled}
                         className={cn(
                           'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none',
                           currentIndex === selectedIndex
                             ? 'bg-accent text-accent-foreground'
-                            : 'text-foreground hover:bg-accent/50'
+                            : 'text-foreground hover:bg-accent/50',
+                          item.disabled && 'cursor-not-allowed opacity-60'
                         )}
-                        onClick={() => executeAction(item)}
+                        onClick={() => !item.disabled && executeAction(item)}
                         onMouseEnter={() => setSelectedIndex(currentIndex)}
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className={cn('h-4 w-4', item.loading && 'animate-spin')} />
                         <span className="flex-1 text-left">{item.label}</span>
                         {item.shortcut && <CommandShortcut>{item.shortcut}</CommandShortcut>}
                       </button>
