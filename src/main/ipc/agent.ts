@@ -7,7 +7,7 @@ const registry = new AgentRegistry(BUILTIN_AGENTS);
 export const agentSessionManager = new AgentSessionManager();
 
 export function stopAllAgentSessions(): void {
-  sessionManager.stopAll();
+  agentSessionManager.stopAll();
 }
 
 export function registerAgentHandlers(): void {
