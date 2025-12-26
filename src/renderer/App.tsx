@@ -1,6 +1,10 @@
 import type { GitWorktree, WorktreeCreateOptions } from '@shared/types';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { panelTransition, type Repository, type TabId } from './App/constants';
+import { getStoredBoolean, getStoredTabMap, pathsEqual, STORAGE_KEYS } from './App/storage';
+import { useAppKeyboardShortcuts } from './App/useAppKeyboardShortcuts';
+import { usePanelResize } from './App/usePanelResize';
 import { ActionPanel } from './components/layout/ActionPanel';
 import { MainContent } from './components/layout/MainContent';
 import { RepositorySidebar } from './components/layout/RepositorySidebar';
@@ -20,67 +24,9 @@ import { useEditor } from './hooks/useEditor';
 import { useGitBranches, useGitInit } from './hooks/useGit';
 import { useWorktreeCreate, useWorktreeList, useWorktreeRemove } from './hooks/useWorktree';
 import { useI18n } from './i18n';
-import { matchesKeybinding } from './lib/keybinding';
 import { useNavigationStore } from './stores/navigation';
 import { useSettingsStore } from './stores/settings';
 import { useWorktreeStore } from './stores/worktree';
-
-// Animation config
-const panelTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
-
-type TabId = 'chat' | 'file' | 'terminal' | 'source-control';
-
-interface Repository {
-  name: string;
-  path: string;
-}
-
-// Panel size constraints
-const REPOSITORY_MIN = 200;
-const REPOSITORY_MAX = 400;
-const REPOSITORY_DEFAULT = 240;
-const WORKTREE_MIN = 200;
-const WORKTREE_MAX = 400;
-const WORKTREE_DEFAULT = 280;
-
-// Helper to get initial value from localStorage
-const getStoredNumber = (key: string, defaultValue: number) => {
-  const saved = localStorage.getItem(key);
-  return saved ? Number(saved) : defaultValue;
-};
-
-const getStoredBoolean = (key: string, defaultValue: boolean) => {
-  const saved = localStorage.getItem(key);
-  return saved !== null ? saved === 'true' : defaultValue;
-};
-
-const getStoredTabMap = (): Record<string, TabId> => {
-  const saved = localStorage.getItem('enso-worktree-tabs');
-  if (saved) {
-    try {
-      return JSON.parse(saved) as Record<string, TabId>;
-    } catch {
-      return {};
-    }
-  }
-  return {};
-};
-
-// Normalize path for comparison (handles Windows case-insensitivity and trailing slashes)
-const normalizePath = (path: string): string => {
-  // Remove trailing slashes/backslashes
-  let normalized = path.replace(/[\\/]+$/, '');
-  // On Windows, normalize to lowercase for case-insensitive comparison
-  if (navigator.platform.startsWith('Win')) {
-    normalized = normalized.toLowerCase();
-  }
-  return normalized;
-};
-
-// Check if two paths are equal (considering OS-specific rules)
-const pathsEqual = (path1: string, path2: string): boolean => {
-  return normalizePath(path1) === normalizePath(path2);
-};
 
 export default function App() {
   const { t } = useI18n();
@@ -91,18 +37,12 @@ export default function App() {
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [activeWorktree, setActiveWorktree] = useState<GitWorktree | null>(null);
 
-  // Panel sizes and collapsed states - initialize from localStorage
-  const [repositoryWidth, setRepositoryWidth] = useState(() =>
-    getStoredNumber('enso-repository-width', REPOSITORY_DEFAULT)
-  );
-  const [worktreeWidth, setWorktreeWidth] = useState(() =>
-    getStoredNumber('enso-worktree-width', WORKTREE_DEFAULT)
-  );
+  // Panel collapsed states - initialize from localStorage
   const [repositoryCollapsed, setRepositoryCollapsed] = useState(() =>
-    getStoredBoolean('enso-repository-collapsed', false)
+    getStoredBoolean(STORAGE_KEYS.REPOSITORY_COLLAPSED, false)
   );
   const [worktreeCollapsed, setWorktreeCollapsed] = useState(() =>
-    getStoredBoolean('enso-worktree-collapsed', false)
+    getStoredBoolean(STORAGE_KEYS.WORKTREE_COLLAPSED, false)
   );
 
   // Settings dialog state
@@ -114,10 +54,8 @@ export default function App() {
   // Close confirmation dialog state
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
 
-  // Resize state
-  const [resizing, setResizing] = useState<'repository' | 'worktree' | null>(null);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(0);
+  // Panel resize hook
+  const { repositoryWidth, worktreeWidth, resizing, handleResizeStart } = usePanelResize();
 
   const worktreeError = useWorktreeStore((s) => s.error);
 
@@ -127,6 +65,28 @@ export default function App() {
   // Navigation store for terminal -> editor file navigation
   const { pendingNavigation, clearNavigation } = useNavigationStore();
   const { navigateToFile } = useEditor();
+
+  // Handle tab change and persist to worktree tab map
+  const handleTabChange = useCallback(
+    (tab: TabId) => {
+      setActiveTab(tab);
+      // Save tab state for current worktree
+      if (activeWorktree?.path) {
+        setWorktreeTabMap((prev) => ({
+          ...prev,
+          [activeWorktree.path]: tab,
+        }));
+      }
+    },
+    [activeWorktree]
+  );
+
+  // Keyboard shortcuts
+  useAppKeyboardShortcuts({
+    activeWorktreePath: activeWorktree?.path,
+    onTabSwitch: handleTabChange,
+    onActionPanelToggle: useCallback(() => setActionPanelOpen((prev) => !prev), []),
+  });
 
   // Handle terminal file link navigation
   useEffect(() => {
@@ -173,116 +133,19 @@ export default function App() {
     return cleanup;
   }, []);
 
-  // Listen for Action Panel keyboard shortcut (Shift+Cmd+P)
+  // Save collapsed states to localStorage
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'p' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setActionPanelOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Listen for main tab switching keyboard shortcuts
-  useEffect(() => {
-    const switchTab = (tab: TabId) => {
-      setActiveTab(tab);
-      const worktreePath = activeWorktree?.path;
-      if (worktreePath) {
-        setWorktreeTabMap((prev) => ({
-          ...prev,
-          [worktreePath]: tab,
-        }));
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const bindings = useSettingsStore.getState().mainTabKeybindings;
-
-      if (matchesKeybinding(e, bindings.switchToAgent)) {
-        e.preventDefault();
-        switchTab('chat');
-        return;
-      }
-
-      if (matchesKeybinding(e, bindings.switchToFile)) {
-        e.preventDefault();
-        switchTab('file');
-        return;
-      }
-
-      if (matchesKeybinding(e, bindings.switchToTerminal)) {
-        e.preventDefault();
-        switchTab('terminal');
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeWorktree]);
-
-  // Save panel sizes to localStorage
-  useEffect(() => {
-    localStorage.setItem('enso-repository-width', String(repositoryWidth));
-  }, [repositoryWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('enso-worktree-width', String(worktreeWidth));
-  }, [worktreeWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('enso-repository-collapsed', String(repositoryCollapsed));
+    localStorage.setItem(STORAGE_KEYS.REPOSITORY_COLLAPSED, String(repositoryCollapsed));
   }, [repositoryCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('enso-worktree-collapsed', String(worktreeCollapsed));
+    localStorage.setItem(STORAGE_KEYS.WORKTREE_COLLAPSED, String(worktreeCollapsed));
   }, [worktreeCollapsed]);
 
   // Persist worktree tab map to localStorage
   useEffect(() => {
-    localStorage.setItem('enso-worktree-tabs', JSON.stringify(worktreeTabMap));
+    localStorage.setItem(STORAGE_KEYS.WORKTREE_TABS, JSON.stringify(worktreeTabMap));
   }, [worktreeTabMap]);
-
-  // Resize handlers
-  const handleResizeStart = useCallback(
-    (panel: 'repository' | 'worktree') => (e: React.MouseEvent) => {
-      e.preventDefault();
-      setResizing(panel);
-      startXRef.current = e.clientX;
-      startWidthRef.current = panel === 'repository' ? repositoryWidth : worktreeWidth;
-    },
-    [repositoryWidth, worktreeWidth]
-  );
-
-  useEffect(() => {
-    if (!resizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const delta = e.clientX - startXRef.current;
-      const newWidth = startWidthRef.current + delta;
-
-      if (resizing === 'repository') {
-        setRepositoryWidth(Math.max(REPOSITORY_MIN, Math.min(REPOSITORY_MAX, newWidth)));
-      } else {
-        setWorktreeWidth(Math.max(WORKTREE_MIN, Math.min(WORKTREE_MAX, newWidth)));
-      }
-    };
-
-    const handleMouseUp = () => {
-      setResizing(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [resizing]);
 
   // Get worktrees for selected repo
   const {
@@ -301,7 +164,7 @@ export default function App() {
 
   // Load saved repositories and selection from localStorage
   useEffect(() => {
-    const savedRepos = localStorage.getItem('enso-repositories');
+    const savedRepos = localStorage.getItem(STORAGE_KEYS.REPOSITORIES);
     if (savedRepos) {
       try {
         const parsed = JSON.parse(savedRepos) as Repository[];
@@ -311,12 +174,12 @@ export default function App() {
       }
     }
 
-    const savedSelectedRepo = localStorage.getItem('enso-selected-repo');
+    const savedSelectedRepo = localStorage.getItem(STORAGE_KEYS.SELECTED_REPO);
     if (savedSelectedRepo) {
       setSelectedRepo(savedSelectedRepo);
     }
 
-    const savedWorktreePath = localStorage.getItem('enso-active-worktree');
+    const savedWorktreePath = localStorage.getItem(STORAGE_KEYS.ACTIVE_WORKTREE);
     if (savedWorktreePath) {
       // Wait for worktrees to load before setting active worktree.
       setActiveWorktree({ path: savedWorktreePath } as GitWorktree);
@@ -325,7 +188,7 @@ export default function App() {
 
   // Save repositories to localStorage
   const saveRepositories = useCallback((repos: Repository[]) => {
-    localStorage.setItem('enso-repositories', JSON.stringify(repos));
+    localStorage.setItem(STORAGE_KEYS.REPOSITORIES, JSON.stringify(repos));
     setRepositories(repos);
   }, []);
 
@@ -367,18 +230,18 @@ export default function App() {
   // Save selected repo to localStorage
   useEffect(() => {
     if (selectedRepo) {
-      localStorage.setItem('enso-selected-repo', selectedRepo);
+      localStorage.setItem(STORAGE_KEYS.SELECTED_REPO, selectedRepo);
     } else {
-      localStorage.removeItem('enso-selected-repo');
+      localStorage.removeItem(STORAGE_KEYS.SELECTED_REPO);
     }
   }, [selectedRepo]);
 
   // Save active worktree to localStorage
   useEffect(() => {
     if (activeWorktree) {
-      localStorage.setItem('enso-active-worktree', activeWorktree.path);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_WORKTREE, activeWorktree.path);
     } else {
-      localStorage.removeItem('enso-active-worktree');
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_WORKTREE);
     }
   }, [activeWorktree]);
 
@@ -409,21 +272,6 @@ export default function App() {
     setSelectedRepo(repoPath);
     setActiveWorktree(null);
   };
-
-  // Handle tab change and persist to worktree tab map
-  const handleTabChange = useCallback(
-    (tab: TabId) => {
-      setActiveTab(tab);
-      // Save tab state for current worktree
-      if (activeWorktree?.path) {
-        setWorktreeTabMap((prev) => ({
-          ...prev,
-          [activeWorktree.path]: tab,
-        }));
-      }
-    },
-    [activeWorktree]
-  );
 
   const handleSelectWorktree = useCallback(
     (worktree: GitWorktree) => {

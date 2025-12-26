@@ -1,0 +1,78 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  REPOSITORY_DEFAULT,
+  REPOSITORY_MAX,
+  REPOSITORY_MIN,
+  WORKTREE_DEFAULT,
+  WORKTREE_MAX,
+  WORKTREE_MIN,
+} from './constants';
+import { getStoredNumber, STORAGE_KEYS } from './storage';
+
+type ResizePanel = 'repository' | 'worktree' | null;
+
+export function usePanelResize() {
+  const [repositoryWidth, setRepositoryWidth] = useState(() =>
+    getStoredNumber(STORAGE_KEYS.REPOSITORY_WIDTH, REPOSITORY_DEFAULT)
+  );
+  const [worktreeWidth, setWorktreeWidth] = useState(() =>
+    getStoredNumber(STORAGE_KEYS.WORKTREE_WIDTH, WORKTREE_DEFAULT)
+  );
+  const [resizing, setResizing] = useState<ResizePanel>(null);
+
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const handleResizeStart = useCallback(
+    (panel: 'repository' | 'worktree') => (e: React.MouseEvent) => {
+      e.preventDefault();
+      setResizing(panel);
+      startXRef.current = e.clientX;
+      startWidthRef.current = panel === 'repository' ? repositoryWidth : worktreeWidth;
+    },
+    [repositoryWidth, worktreeWidth]
+  );
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startXRef.current;
+      const newWidth = startWidthRef.current + delta;
+
+      if (resizing === 'repository') {
+        setRepositoryWidth(Math.max(REPOSITORY_MIN, Math.min(REPOSITORY_MAX, newWidth)));
+      } else {
+        setWorktreeWidth(Math.max(WORKTREE_MIN, Math.min(WORKTREE_MAX, newWidth)));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setResizing(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizing]);
+
+  // Save panel sizes to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.REPOSITORY_WIDTH, String(repositoryWidth));
+  }, [repositoryWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.WORKTREE_WIDTH, String(worktreeWidth));
+  }, [worktreeWidth]);
+
+  return {
+    repositoryWidth,
+    worktreeWidth,
+    resizing,
+    handleResizeStart,
+  };
+}
