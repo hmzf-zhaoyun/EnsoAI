@@ -159,6 +159,30 @@ export function FilePanel({ rootPath, isActive = false }: FilePanelProps) {
     setPendingCursor(null);
   }, [setPendingCursor]);
 
+  // Handle breadcrumb click - expand path in file tree
+  const handleBreadcrumbClick = useCallback(
+    (path: string) => {
+      if (!rootPath) return;
+
+      // Get all parent paths that need to be expanded
+      const relativePath = path.startsWith(rootPath)
+        ? path.slice(rootPath.length).replace(/^\//, '')
+        : path;
+
+      const parts = relativePath.split('/');
+      let currentPath = rootPath;
+
+      // Expand each parent directory
+      for (const part of parts) {
+        currentPath = `${currentPath}/${part}`;
+        if (!expandedPaths.has(currentPath)) {
+          toggleExpand(currentPath);
+        }
+      }
+    },
+    [rootPath, expandedPaths, toggleExpand]
+  );
+
   if (!rootPath) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -193,6 +217,7 @@ export function FilePanel({ rootPath, isActive = false }: FilePanelProps) {
           activeTab={activeTab}
           activeTabPath={activeTab?.path ?? null}
           pendingCursor={pendingCursor}
+          rootPath={rootPath}
           onTabClick={handleTabClick}
           onTabClose={handleTabClose}
           onTabReorder={reorderTabs}
@@ -200,6 +225,7 @@ export function FilePanel({ rootPath, isActive = false }: FilePanelProps) {
           onViewStateChange={setTabViewState}
           onSave={handleSave}
           onClearPendingCursor={handleClearPendingCursor}
+          onBreadcrumbClick={handleBreadcrumbClick}
         />
       </div>
 

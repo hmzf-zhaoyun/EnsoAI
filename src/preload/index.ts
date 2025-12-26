@@ -71,7 +71,7 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_DIFF_STATS, workdir),
     generateCommitMessage: (
       workdir: string,
-      options: { maxDiffLines: number; timeout: number }
+      options: { maxDiffLines: number; timeout: number; model: string }
     ): Promise<{ success: boolean; message?: string; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_GENERATE_COMMIT_MSG, workdir, options),
   },

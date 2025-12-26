@@ -7,7 +7,7 @@ import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createHighlighterCore } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
@@ -16,6 +16,14 @@ import langSvelte from 'shiki/langs/svelte.mjs';
 import langVue from 'shiki/langs/vue.mjs';
 import themeVitesseDark from 'shiki/themes/vitesse-dark.mjs';
 import themeVitesseLight from 'shiki/themes/vitesse-light.mjs';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import {
   Empty,
   EmptyDescription,
@@ -189,6 +197,7 @@ interface EditorAreaProps {
   activeTab: EditorTab | null;
   activeTabPath: string | null;
   pendingCursor: PendingCursor | null;
+  rootPath?: string;
   onTabClick: (path: string) => void;
   onTabClose: (path: string) => void | Promise<void>;
   onTabReorder: (fromIndex: number, toIndex: number) => void;
@@ -196,6 +205,7 @@ interface EditorAreaProps {
   onViewStateChange: (path: string, viewState: unknown) => void;
   onSave: (path: string) => void;
   onClearPendingCursor: () => void;
+  onBreadcrumbClick?: (path: string) => void;
 }
 
 export function EditorArea({
@@ -203,6 +213,7 @@ export function EditorArea({
   activeTab,
   activeTabPath,
   pendingCursor,
+  rootPath,
   onTabClick,
   onTabClose,
   onTabReorder,
@@ -210,6 +221,7 @@ export function EditorArea({
   onViewStateChange,
   onSave,
   onClearPendingCursor,
+  onBreadcrumbClick,
 }: EditorAreaProps) {
   const { t } = useI18n();
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -223,6 +235,24 @@ export function EditorArea({
   const hasPendingAutoSaveRef = useRef(false);
   const blurDisposableRef = useRef<monaco.IDisposable | null>(null);
   const activeTabPathRef = useRef<string | null>(null);
+
+  // Calculate breadcrumb segments from active file path
+  const breadcrumbSegments = useMemo(() => {
+    if (!activeTabPath || !rootPath) return [];
+
+    const relativePath = activeTabPath.startsWith(rootPath)
+      ? activeTabPath.slice(rootPath.length).replace(/^\//, '')
+      : activeTabPath;
+
+    if (!relativePath) return [];
+
+    const parts = relativePath.split('/');
+    return parts.map((name, index) => ({
+      name,
+      path: `${rootPath}/${parts.slice(0, index + 1).join('/')}`,
+      isLast: index === parts.length - 1,
+    }));
+  }, [activeTabPath, rootPath]);
 
   // Keep ref in sync with activeTabPath
   useEffect(() => {
@@ -683,6 +713,34 @@ export function EditorArea({
         onTabClose={handleTabClose}
         onTabReorder={onTabReorder}
       />
+
+      {/* Breadcrumb */}
+      {activeTab && breadcrumbSegments.length > 0 && (
+        <div className="shrink-0 border-b bg-background px-3 py-1">
+          <Breadcrumb>
+            <BreadcrumbList className="flex-nowrap text-xs">
+              {breadcrumbSegments.map((segment, index) => (
+                <span key={segment.path} className="contents">
+                  {index > 0 && <BreadcrumbSeparator className="[&>svg]:size-3" />}
+                  <BreadcrumbItem className="min-w-0">
+                    {segment.isLast ? (
+                      <BreadcrumbPage className="truncate">{segment.name}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink
+                        render={<button type="button" />}
+                        className="truncate"
+                        onClick={() => onBreadcrumbClick?.(segment.path)}
+                      >
+                        {segment.name}
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </span>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      )}
 
       {/* Editor */}
       <div className="relative min-w-0 flex-1">
