@@ -18,6 +18,7 @@ interface EditorState {
   tabs: EditorTab[];
   activeTabPath: string | null;
   pendingCursor: PendingCursor | null;
+  currentCursorLine: number | null; // Current cursor line in active editor
 
   openFile: (file: Omit<EditorTab, 'title' | 'viewState'> & { title?: string }) => void;
   closeFile: (path: string) => void;
@@ -27,6 +28,7 @@ interface EditorState {
   setTabViewState: (path: string, viewState: unknown) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   setPendingCursor: (cursor: PendingCursor | null) => void;
+  setCurrentCursorLine: (line: number | null) => void;
 }
 
 const getTabTitle = (path: string) => path.split(/[/\\]/).pop() || path;
@@ -35,6 +37,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   tabs: [],
   activeTabPath: null,
   pendingCursor: null,
+  currentCursorLine: null,
 
   openFile: (file) =>
     set((state) => {
@@ -99,4 +102,6 @@ export const useEditorStore = create<EditorState>((set) => ({
     }),
 
   setPendingCursor: (cursor) => set({ pendingCursor: cursor }),
+
+  setCurrentCursorLine: (line) => set({ currentCursorLine: line }),
 }));

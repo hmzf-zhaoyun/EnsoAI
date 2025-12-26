@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
@@ -435,7 +435,16 @@ export class AppDetector {
     return detected;
   }
 
-  async openPath(path: string, bundleId: string): Promise<void> {
+  async openPath(
+    path: string,
+    bundleId: string,
+    options?: {
+      line?: number;
+      workspacePath?: string;
+      openFiles?: string[];
+      activeFile?: string;
+    }
+  ): Promise<void> {
     const detectedApp = this.detectedApps.find((a) => a.bundleId === bundleId);
     if (!detectedApp) {
       throw new Error(`App with bundle ID ${bundleId} not found`);
@@ -446,25 +455,150 @@ export class AppDetector {
       const escapedPath = path.replace(/'/g, "''");
 
       if (bundleId === 'windows.terminal') {
-        // Windows Terminal uses -d flag for working directory
         await execAsync(
           `powershell -Command "Start-Process -FilePath '${escapedExe}' -ArgumentList '-d','${escapedPath}'"`
         );
       } else if (detectedApp.category === AppCategory.Terminal) {
-        // Other terminal apps: use -WorkingDirectory to open in the specified directory
         await execAsync(
           `powershell -Command "Start-Process -FilePath '${escapedExe}' -WorkingDirectory '${escapedPath}'"`
         );
       } else {
-        // Editors and other apps: pass path as argument
+        const pathArg = options?.line ? `${escapedPath}:${options.line}` : escapedPath;
         await execAsync(
-          `powershell -Command "Start-Process -FilePath '${escapedExe}' -ArgumentList '${escapedPath}'"`
+          `powershell -Command "Start-Process -FilePath '${escapedExe}' -ArgumentList '${pathArg}'"`
         );
       }
     } else {
-      // macOS: use open command
-      await execAsync(`open -b "${bundleId}" "${path}"`);
+      // macOS: use open command or direct CLI
+      if (detectedApp.category === AppCategory.Editor && options?.workspacePath) {
+        // For editors, use CLI to open workspace with files
+        await this.openEditorWithFiles(bundleId, detectedApp.path, options);
+      } else if (options?.line && detectedApp.category === AppCategory.Editor) {
+        const lineArgs = this.getLineArgs(bundleId, path, options.line);
+        await execAsync(`open -b "${bundleId}" ${lineArgs}`);
+      } else {
+        await execAsync(`open -b "${bundleId}" "${path}"`);
+      }
     }
+  }
+
+  private async openEditorWithFiles(
+    bundleId: string,
+    appPath: string,
+    options: {
+      workspacePath: string;
+      openFiles?: string[];
+      activeFile?: string;
+      line?: number;
+    }
+  ): Promise<void> {
+    // Get CLI executable path based on editor type
+    const cliPath = this.getEditorCliPath(bundleId, appPath);
+
+    if (!cliPath) {
+      // Fallback to simple open
+      await execAsync(`open -b "${bundleId}" "${options.workspacePath}"`);
+      return;
+    }
+
+    // Strategy: Open workspace and all files first, then use -g to navigate to specific line
+    // This ensures the workspace is loaded before attempting to jump to the line
+    const allFiles = options.openFiles || [];
+
+    // Step 1: Open workspace with all files (including activeFile)
+    let cmd1 = `"${cliPath}" "${options.workspacePath}"`;
+    for (const file of allFiles) {
+      cmd1 += ` "${file}"`;
+    }
+
+    try {
+      await execAsync(cmd1);
+
+      // Step 2: If we have an active file with a line number, use -g to navigate
+      if (options.activeFile && options.line) {
+        // Wait a bit for editor to load the workspace
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const cmd2 = `"${cliPath}" -g "${options.activeFile}:${options.line}"`;
+        await execAsync(cmd2);
+      }
+    } catch {
+      // CLI failed, fallback to open command
+      await execAsync(`open -b "${bundleId}" "${options.workspacePath}"`);
+    }
+  }
+
+  private getEditorCliPath(bundleId: string, appPath: string): string | null {
+    // VSCode, Cursor, Codium
+    if (
+      bundleId.includes('com.microsoft.VSCode') ||
+      bundleId.includes('com.todesktop.230313mzl4w4u92') || // Cursor
+      bundleId.includes('com.visualstudio.code')
+    ) {
+      // Try to find CLI in common locations
+      const possiblePaths = [
+        '/usr/local/bin/cursor',
+        '/opt/homebrew/bin/cursor',
+        '/usr/local/bin/code',
+        '/opt/homebrew/bin/code',
+        `${appPath}/Contents/Resources/app/bin/cursor`,
+        `${appPath}/Contents/Resources/app/bin/code`,
+      ];
+
+      for (const path of possiblePaths) {
+        try {
+          execSync(`test -f "${path}"`);
+          return path;
+        } catch {}
+      }
+    }
+
+    // Zed
+    if (bundleId.includes('dev.zed.Zed')) {
+      const possiblePaths = ['/usr/local/bin/zed', '/opt/homebrew/bin/zed'];
+      for (const path of possiblePaths) {
+        try {
+          execSync(`test -f "${path}"`);
+          return path;
+        } catch {}
+      }
+    }
+
+    return null;
+  }
+
+  private getLineArgs(bundleId: string, path: string, line: number): string {
+    // VSCode, Cursor, Codium (all use VSCode format)
+    if (
+      bundleId.includes('com.microsoft.VSCode') ||
+      bundleId.includes('com.todesktop.230313mzl4w4u92') || // Cursor
+      bundleId.includes('com.visualstudio.code')
+    ) {
+      return `--args "${path}" -g "${path}:${line}"`;
+    }
+
+    // Zed
+    if (bundleId.includes('dev.zed.Zed')) {
+      return `"${path}:${line}"`;
+    }
+
+    // Sublime Text
+    if (bundleId.includes('com.sublimetext')) {
+      return `"${path}:${line}"`;
+    }
+
+    // IntelliJ IDEA, WebStorm, PyCharm, etc.
+    if (bundleId.includes('com.jetbrains')) {
+      return `--args --line ${line} "${path}"`;
+    }
+
+    // Atom
+    if (bundleId.includes('com.github.atom')) {
+      return `"${path}:${line}"`;
+    }
+
+    // Default: try file:line format (works for many editors)
+    return `"${path}:${line}"`;
   }
 
   async getAppIcon(bundleId: string): Promise<string | undefined> {

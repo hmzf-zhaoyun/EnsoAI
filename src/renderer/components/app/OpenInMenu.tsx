@@ -3,6 +3,7 @@ import { ChevronDown, FileCode, FolderOpen, Terminal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Select, SelectItem, SelectPopup, SelectTrigger } from '@/components/ui/select';
 import { useDetectedApps, useOpenWith } from '@/hooks/useAppDetector';
+import { useEditorStore } from '@/stores/editor';
 
 function AppIcon({
   bundleId,
@@ -27,14 +28,18 @@ function AppIcon({
   return <Fallback className="size-5" />;
 }
 
+type TabId = 'chat' | 'file' | 'terminal' | 'source-control';
+
 interface OpenInMenuProps {
   path?: string;
+  activeTab?: TabId;
 }
 
-export function OpenInMenu({ path }: OpenInMenuProps) {
+export function OpenInMenu({ path, activeTab }: OpenInMenuProps) {
   const { data: apps = [], isLoading } = useDetectedApps();
   const openWith = useOpenWith();
   const [lastUsedApp, setLastUsedApp] = useState<string>('');
+  const { activeTabPath, tabs, currentCursorLine } = useEditorStore();
 
   useEffect(() => {
     const saved = localStorage.getItem('enso-last-opened-app');
@@ -44,11 +49,28 @@ export function OpenInMenu({ path }: OpenInMenuProps) {
   }, []);
 
   const handleOpen = async (bundleId: string | null) => {
-    if (!bundleId) return;
-    if (!path) return;
+    if (!bundleId || !path) return;
+
     setLastUsedApp(bundleId);
     localStorage.setItem('enso-last-opened-app', bundleId);
-    await openWith.mutateAsync({ path, bundleId });
+
+    // If in file editor tab and files are open, sync all open files
+    if (activeTab === 'file' && tabs.length > 0) {
+      const openFiles = tabs.map((tab) => tab.path);
+      await openWith.mutateAsync({
+        path,
+        bundleId,
+        options: {
+          workspacePath: path,
+          openFiles,
+          activeFile: activeTabPath || undefined,
+          line: currentCursorLine || undefined,
+        },
+      });
+    } else {
+      // Otherwise just open the directory/path
+      await openWith.mutateAsync({ path, bundleId });
+    }
   };
 
   const handleQuickOpen = () => {
@@ -86,6 +108,10 @@ export function OpenInMenu({ path }: OpenInMenuProps) {
   const defaultApp = lastApp || apps.find((app) => app.category === 'finder') || apps[0];
   const groupedApps = groupAppsByCategory(apps);
 
+  // Determine what we're opening
+  const isOpeningFile = activeTab === 'file' && activeTabPath;
+  const displayIcon = isOpeningFile ? FileCode : FolderOpen;
+
   return (
     <div className="flex h-8 items-center rounded-full bg-muted">
       {/* Left: Quick open button */}
@@ -94,7 +120,7 @@ export function OpenInMenu({ path }: OpenInMenuProps) {
         onClick={handleQuickOpen}
         className="flex h-full items-center gap-1.5 px-3 text-sm hover:bg-accent/50 rounded-l-full transition-colors"
       >
-        <AppIcon bundleId={defaultApp.bundleId} name={defaultApp.name} fallback={FolderOpen} />
+        <AppIcon bundleId={defaultApp.bundleId} name={defaultApp.name} fallback={displayIcon} />
         <span>{defaultApp.name}</span>
       </button>
 

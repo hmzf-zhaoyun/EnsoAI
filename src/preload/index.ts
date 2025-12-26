@@ -204,8 +204,16 @@ const electronAPI = {
   // App Detector
   appDetector: {
     detectApps: (): Promise<DetectedApp[]> => ipcRenderer.invoke(IPC_CHANNELS.APP_DETECT),
-    openWith: (path: string, bundleId: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_WITH, path, bundleId),
+    openWith: (
+      path: string,
+      bundleId: string,
+      options?: {
+        line?: number;
+        workspacePath?: string;
+        openFiles?: string[];
+        activeFile?: string;
+      }
+    ): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_WITH, path, bundleId, options),
     getIcon: (bundleId: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_ICON, bundleId),
   },

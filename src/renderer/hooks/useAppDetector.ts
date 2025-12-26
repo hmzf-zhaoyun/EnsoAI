@@ -12,8 +12,21 @@ export function useDetectedApps() {
 
 export function useOpenWith() {
   return useMutation({
-    mutationFn: async ({ path, bundleId }: { path: string; bundleId: string }) => {
-      await window.electronAPI.appDetector.openWith(path, bundleId);
+    mutationFn: async ({
+      path,
+      bundleId,
+      options,
+    }: {
+      path: string;
+      bundleId: string;
+      options?: {
+        line?: number;
+        workspacePath?: string;
+        openFiles?: string[];
+        activeFile?: string;
+      };
+    }) => {
+      await window.electronAPI.appDetector.openWith(path, bundleId, options);
     },
   });
 }

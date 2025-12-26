@@ -7,9 +7,22 @@ export function registerAppHandlers() {
     return await appDetector.detectApps();
   });
 
-  ipcMain.handle(IPC_CHANNELS.APP_OPEN_WITH, async (_, path: string, bundleId: string) => {
-    await appDetector.openPath(path, bundleId);
-  });
+  ipcMain.handle(
+    IPC_CHANNELS.APP_OPEN_WITH,
+    async (
+      _,
+      path: string,
+      bundleId: string,
+      options?: {
+        line?: number;
+        workspacePath?: string;
+        openFiles?: string[];
+        activeFile?: string;
+      }
+    ) => {
+      await appDetector.openPath(path, bundleId, options);
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_ICON, async (_, bundleId: string) => {
     return await appDetector.getAppIcon(bundleId);

@@ -144,7 +144,7 @@ export function MainContent({
 
         {/* Right: Open In Menu */}
         <div className="flex items-center gap-2 no-drag">
-          <OpenInMenu path={worktreePath} />
+          <OpenInMenu path={worktreePath} activeTab={activeTab} />
         </div>
       </header>
 
