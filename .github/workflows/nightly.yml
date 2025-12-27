@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,123 +25,14 @@ jobs:
       - name: Generate Version
         id: version
         run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           DATE=$(date +'%Y%m%d')
-          VERSION="0.0.0-nightly.${DATE}.${SHORT_SHA}"
-          TAG="nightly"
+          VERSION="${BASE_VERSION}-nightly.${DATE}.${SHORT_SHA}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION"
 
-  build-mac:
-    needs: prepare
-    strategy:
-      matrix:
-        arch: [arm64, x64]
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-store-
-
-      - name: Cache Electron
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/electron
-          key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-electron-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set version
-        run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
-
-      - name: Build macOS (${{ matrix.arch }})
-        run: pnpm build && npx electron-builder --mac --${{ matrix.arch }} --publish never
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-${{ matrix.arch }}
-          path: |
-            dist/*.dmg
-            dist/*.zip
-          retention-days: 7
-
-  build-windows:
-    needs: prepare
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-store-
-
-      - name: Cache Electron
-        uses: actions/cache@v4
-        with:
-          path: ~/AppData/Local/electron/Cache
-          key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-electron-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set version
-        run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
-
-      - name: Build Windows
-        run: pnpm build && npx electron-builder --win --x64 --publish never
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-x64
-          path: |
-            dist/*.exe
-          retention-days: 7
-
-  build-linux:
+  # 先构建 Vite 产物，共享给所有平台
+  build-app:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
@@ -158,22 +48,14 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
-        shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-store-
-
-      - name: Cache Electron
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron
-          key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-electron-
+          key: pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -181,18 +63,182 @@ jobs:
       - name: Set version
         run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
 
-      - name: Build Linux
-        run: pnpm build && npx electron-builder --linux --x64 --publish never
+      - name: Build app
+        run: pnpm build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: |
+            out/
+            package.json
+          retention-days: 1
+
+  build-mac:
+    needs: [prepare, build-app]
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x64
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.arch }}-pnpm-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-${{ matrix.arch }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.arch }}-electron-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build macOS (${{ matrix.arch }})
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never -c.mac.target=dmg -c.dmg.writeUpdateInfo=false
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: dist/*.dmg
+          retention-days: 7
+
+  build-windows:
+    needs: [prepare, build-app]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows
+        run: npx electron-builder --win --x64 --publish never -c.win.target=portable
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/*portable*.exe
+          retention-days: 7
+
+  build-linux:
+    needs: [prepare, build-app]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Linux
+        run: npx electron-builder --linux --x64 --publish never -c.linux.target=AppImage
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: |
-            dist/*.AppImage
-            dist/*.deb
+          path: dist/*.AppImage
           retention-days: 7
 
   release:
@@ -210,7 +256,7 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          find artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" \) -exec cp {} release/ \;
           ls -la release/
 
       - name: Delete existing nightly release
@@ -246,10 +292,8 @@ jobs:
           |------|------|
           | macOS (Apple Silicon) | EnsoAI-${VERSION}-arm64.dmg |
           | macOS (Intel) | EnsoAI-${VERSION}.dmg |
-          | Windows (x64 安装版) | EnsoAI-Setup-${VERSION}.exe |
-          | Windows (x64 便携版) | EnsoAI-${VERSION}-portable.exe |
-          | Linux (x64 AppImage) | EnsoAI-${VERSION}.AppImage |
-          | Linux (x64 deb) | ensoai_${VERSION}_amd64.deb |
+          | Windows (x64) | EnsoAI-${VERSION}-portable.exe |
+          | Linux (x64) | EnsoAI-${VERSION}.AppImage |
 
           > ⚠️ **macOS 用户注意**: 由于应用未签名，首次打开可能提示"已损坏"，请在终端执行：
           > \`\`\`bash
@@ -261,4 +305,5 @@ jobs:
             --title "Nightly Build (${SHORT_SHA})" \
             --notes-file notes.md \
             --prerelease \
+            --target ${{ github.sha }} \
             release/*
