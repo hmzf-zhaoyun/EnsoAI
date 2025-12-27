@@ -247,4 +247,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit ${{ steps.tag.outputs.name }} --notes-file release-notes.md
+          gh release edit ${{ steps.tag.outputs.name }} --notes-file release-notes.md --latest
