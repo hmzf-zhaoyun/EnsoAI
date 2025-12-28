@@ -18,4 +18,10 @@ export function registerUpdaterHandlers(): void {
     const { autoUpdaterService } = await import('../services/updater/AutoUpdater');
     autoUpdaterService.quitAndInstall();
   });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_SET_ALLOW_PRERELEASE, async (_, allow: boolean) => {
+    if (!isUpdaterEnabled()) return;
+    const { autoUpdaterService } = await import('../services/updater/AutoUpdater');
+    autoUpdaterService.setAllowPrerelease(allow);
+  });
 }

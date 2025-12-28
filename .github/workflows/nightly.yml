@@ -134,7 +134,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build macOS (${{ matrix.arch }})
-        run: npx electron-builder --mac --${{ matrix.arch }} --publish never --config.mac.target=dmg --config.dmg.writeUpdateInfo=false
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never --config.mac.target=dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -109,6 +109,7 @@ export const IPC_CHANNELS = {
   UPDATER_CHECK: 'updater:check',
   UPDATER_QUIT_AND_INSTALL: 'updater:quitAndInstall',
   UPDATER_STATUS: 'updater:status',
+  UPDATER_SET_ALLOW_PRERELEASE: 'updater:setAllowPrerelease',
 
   // MCP (Claude IDE Bridge)
   MCP_BRIDGE_SET_ENABLED: 'mcp:bridge:setEnabled',

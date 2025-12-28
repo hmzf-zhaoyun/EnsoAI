@@ -30,6 +30,8 @@ export function GeneralSettings() {
     setAgentNotificationDelay,
     agentNotificationEnterDelay,
     setAgentNotificationEnterDelay,
+    allowNightlyUpdates,
+    setAllowNightlyUpdates,
   } = useSettingsStore();
   const { t, locale } = useI18n();
 
@@ -297,6 +299,23 @@ export function GeneralSettings() {
           <p className="text-xs text-muted-foreground">
             {t('How long to wait after pressing Enter before starting idle timer.')}
           </p>
+        </div>
+      </div>
+
+      {/* Updates Section */}
+      <div className="pt-4 border-t">
+        <h3 className="text-lg font-medium">{t('Updates')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Application update settings')}</p>
+      </div>
+
+      {/* Nightly Updates */}
+      <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+        <span className="text-sm font-medium">{t('Nightly updates')}</span>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {t('Check for nightly (pre-release) updates')}
+          </p>
+          <Switch checked={allowNightlyUpdates} onCheckedChange={setAllowNightlyUpdates} />
         </div>
       </div>
     </div>

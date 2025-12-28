@@ -106,6 +106,10 @@ class AutoUpdaterService {
   isUpdateDownloaded(): boolean {
     return this.updateDownloaded;
   }
+
+  setAllowPrerelease(allow: boolean): void {
+    autoUpdater.allowPrerelease = allow;
+  }
 }
 
 export const autoUpdaterService = new AutoUpdaterService();

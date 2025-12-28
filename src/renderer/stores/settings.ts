@@ -326,6 +326,7 @@ interface SettingsState {
   claudeCodeIntegration: ClaudeCodeIntegrationSettings;
   commitMessageGenerator: CommitMessageGeneratorSettings;
   codeReview: CodeReviewSettings;
+  allowNightlyUpdates: boolean;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Locale) => void;
@@ -356,6 +357,7 @@ interface SettingsState {
   setClaudeCodeIntegration: (settings: Partial<ClaudeCodeIntegrationSettings>) => void;
   setCommitMessageGenerator: (settings: Partial<CommitMessageGeneratorSettings>) => void;
   setCodeReview: (settings: Partial<CodeReviewSettings>) => void;
+  setAllowNightlyUpdates: (enabled: boolean) => void;
 }
 
 const defaultAgentSettings: AgentSettings = {
@@ -398,6 +400,7 @@ export const useSettingsStore = create<SettingsState>()(
       claudeCodeIntegration: defaultClaudeCodeIntegrationSettings,
       commitMessageGenerator: defaultCommitMessageGeneratorSettings,
       codeReview: defaultCodeReviewSettings,
+      allowNightlyUpdates: false,
 
       setTheme: (theme) => {
         const terminalTheme = get().terminalTheme;
@@ -512,6 +515,11 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({
           codeReview: { ...state.codeReview, ...settings },
         })),
+      setAllowNightlyUpdates: (allowNightlyUpdates) => {
+        set({ allowNightlyUpdates });
+        // Notify main process to update autoUpdater setting
+        window.electronAPI.updater.setAllowPrerelease(allowNightlyUpdates);
+      },
     }),
     {
       name: 'enso-settings',
