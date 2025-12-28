@@ -81,8 +81,12 @@ jobs:
     needs: [prepare, build-app]
     strategy:
       matrix:
-        arch: [arm64, x64]
-    runs-on: macos-14
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-large
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
