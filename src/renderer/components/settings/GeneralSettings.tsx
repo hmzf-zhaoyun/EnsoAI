@@ -1,6 +1,8 @@
 import type { Locale } from '@shared/i18n';
 import type { ShellInfo } from '@shared/types';
+import { RefreshCw } from 'lucide-react';
 import * as React from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectItem,
@@ -11,6 +13,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/i18n';
 import { type TerminalRenderer, useSettingsStore } from '@/stores/settings';
+
+interface UpdateStatus {
+  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  info?: { version?: string };
+  error?: string;
+}
 
 export function GeneralSettings() {
   const {
@@ -81,12 +89,28 @@ export function GeneralSettings() {
   const [shells, setShells] = React.useState<ShellInfo[]>([]);
   const [loadingShells, setLoadingShells] = React.useState(true);
   const isWindows = window.electronAPI?.env.platform === 'win32';
+  const appVersion = window.electronAPI?.env.appVersion || '0.0.0';
+
+  // Update status state
+  const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
 
   React.useEffect(() => {
     window.electronAPI.shell.detect().then((detected) => {
       setShells(detected);
       setLoadingShells(false);
     });
+  }, []);
+
+  // Listen for update status changes
+  React.useEffect(() => {
+    const cleanup = window.electronAPI.updater.onStatus((status) => {
+      setUpdateStatus(status as UpdateStatus);
+    });
+    return cleanup;
+  }, []);
+
+  const handleCheckForUpdates = React.useCallback(() => {
+    window.electronAPI.updater.checkForUpdates();
   }, []);
 
   const availableShells = shells.filter((s) => s.available);
@@ -306,6 +330,38 @@ export function GeneralSettings() {
       <div className="pt-4 border-t">
         <h3 className="text-lg font-medium">{t('Updates')}</h3>
         <p className="text-sm text-muted-foreground">{t('Application update settings')}</p>
+      </div>
+
+      {/* Current Version */}
+      <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+        <span className="text-sm font-medium">{t('Version')}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">v{appVersion}</span>
+            {updateStatus?.status === 'available' && updateStatus.info?.version && (
+              <span className="text-xs text-green-600 dark:text-green-400">
+                ({t('New version')}: v{updateStatus.info.version})
+              </span>
+            )}
+            {updateStatus?.status === 'not-available' && (
+              <span className="text-xs text-muted-foreground">({t('Up to date')})</span>
+            )}
+            {updateStatus?.status === 'error' && (
+              <span className="text-xs text-destructive">({t('Check failed')})</span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCheckForUpdates}
+            disabled={updateStatus?.status === 'checking' || updateStatus?.status === 'downloading'}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${updateStatus?.status === 'checking' ? 'animate-spin' : ''}`}
+            />
+            {updateStatus?.status === 'checking' ? t('Checking...') : t('Check for updates')}
+          </Button>
+        </div>
       </div>
 
       {/* Nightly Updates */}

@@ -101,4 +101,4 @@ publish:
   provider: github
   owner: J3n5en
   repo: EnsoAI
-  releaseType: release
+  releaseType: draft

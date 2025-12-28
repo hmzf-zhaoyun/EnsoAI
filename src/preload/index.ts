@@ -30,6 +30,7 @@ import type {
 } from '@shared/types';
 import { IPC_CHANNELS } from '@shared/types';
 import { contextBridge, ipcRenderer, shell } from 'electron';
+import pkg from '../../package.json';
 
 const electronAPI = {
   // Git
@@ -305,6 +306,7 @@ const electronAPI = {
   env: {
     HOME: process.env.HOME || process.env.USERPROFILE || '',
     platform: process.platform as 'darwin' | 'win32' | 'linux',
+    appVersion: pkg.version,
   },
 
   // Shell
