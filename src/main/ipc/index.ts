@@ -5,7 +5,10 @@ import { registerCliHandlers } from './cli';
 import { registerDialogHandlers } from './dialog';
 import { registerFileHandlers, stopAllFileWatchers } from './files';
 import { clearAllGitServices, registerGitHandlers } from './git';
-import { cleanupHapi, registerHapiHandlers } from './hapi';
+import { autoStartHapi, cleanupHapi, registerHapiHandlers } from './hapi';
+
+export { autoStartHapi };
+
 import { registerNotificationHandlers } from './notification';
 import { registerSearchHandlers } from './search';
 import { registerSettingsHandlers } from './settings';

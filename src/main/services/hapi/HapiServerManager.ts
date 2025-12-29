@@ -13,6 +13,7 @@ export interface HapiConfig {
 
 export interface HapiStatus {
   running: boolean;
+  ready?: boolean;
   pid?: number;
   port?: number;
   error?: string;
@@ -20,8 +21,8 @@ export interface HapiStatus {
 
 class HapiServerManager extends EventEmitter {
   private process: ChildProcess | null = null;
-  private config: HapiConfig | null = null;
   private status: HapiStatus = { running: false };
+  private ready: boolean = false;
 
   generateToken(): string {
     return randomBytes(32).toString('hex');
@@ -57,8 +58,10 @@ class HapiServerManager extends EventEmitter {
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,
+        detached: process.platform !== 'win32',
       });
 
+      this.ready = false;
       this.status = {
         running: true,
         pid: this.process.pid,
@@ -66,15 +69,32 @@ class HapiServerManager extends EventEmitter {
       };
 
       this.process.stdout?.on('data', (data: Buffer) => {
-        console.log('[hapi]', data.toString());
+        const output = data.toString();
+        console.log('[hapi]', output);
+        // Detect when server is ready (listening message)
+        if (!this.ready && /listening|started|ready/i.test(output)) {
+          console.log('[hapi] Server ready detected!');
+          this.ready = true;
+          this.status = { ...this.status, ready: true };
+          this.emit('statusChanged', this.status);
+        }
       });
 
       this.process.stderr?.on('data', (data: Buffer) => {
-        console.error('[hapi]', data.toString());
+        const output = data.toString();
+        console.error('[hapi]', output);
+        // Also detect ready message from stderr
+        if (!this.ready && /listening|started|ready/i.test(output)) {
+          console.log('[hapi] Server ready detected (stderr)!');
+          this.ready = true;
+          this.status = { ...this.status, ready: true };
+          this.emit('statusChanged', this.status);
+        }
       });
 
       this.process.on('error', (error) => {
         console.error('[hapi] Process error:', error);
+        this.ready = false;
         this.status = { running: false, error: error.message };
         this.process = null;
         this.emit('statusChanged', this.status);
@@ -82,6 +102,7 @@ class HapiServerManager extends EventEmitter {
 
       this.process.on('exit', (code, signal) => {
         console.log(`[hapi] Process exited with code ${code}, signal ${signal}`);
+        this.ready = false;
         this.status = { running: false };
         this.process = null;
         this.emit('statusChanged', this.status);
@@ -106,9 +127,10 @@ class HapiServerManager extends EventEmitter {
 
     return new Promise((resolve) => {
       const proc = this.process!;
+      const pid = proc.pid;
 
       const timeout = setTimeout(() => {
-        proc.kill('SIGKILL');
+        this.killProcessTree(pid, 'SIGKILL');
       }, 5000);
 
       proc.once('exit', () => {
@@ -119,8 +141,24 @@ class HapiServerManager extends EventEmitter {
         resolve(this.status);
       });
 
-      proc.kill('SIGTERM');
+      this.killProcessTree(pid, 'SIGTERM');
     });
+  }
+
+  private killProcessTree(pid: number | undefined, signal: NodeJS.Signals): void {
+    if (!pid) return;
+
+    try {
+      if (process.platform !== 'win32') {
+        // Kill the entire process group on Unix
+        process.kill(-pid, signal);
+      } else {
+        // On Windows, use taskkill to kill the process tree
+        spawn('taskkill', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore' });
+      }
+    } catch {
+      // Process may have already exited
+    }
   }
 
   async restart(config: HapiConfig): Promise<HapiStatus> {
@@ -134,7 +172,7 @@ class HapiServerManager extends EventEmitter {
 
   cleanup(): void {
     if (this.process) {
-      this.process.kill('SIGKILL');
+      this.killProcessTree(this.process.pid, 'SIGKILL');
       this.process = null;
     }
   }

@@ -124,6 +124,14 @@ export const IPC_CHANNELS = {
   HAPI_RESTART: 'hapi:restart',
   HAPI_GET_STATUS: 'hapi:getStatus',
   HAPI_STATUS_CHANGED: 'hapi:statusChanged',
+
+  // Cloudflared Tunnel
+  CLOUDFLARED_CHECK: 'cloudflared:check',
+  CLOUDFLARED_INSTALL: 'cloudflared:install',
+  CLOUDFLARED_START: 'cloudflared:start',
+  CLOUDFLARED_STOP: 'cloudflared:stop',
+  CLOUDFLARED_GET_STATUS: 'cloudflared:getStatus',
+  CLOUDFLARED_STATUS_CHANGED: 'cloudflared:statusChanged',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

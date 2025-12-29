@@ -198,6 +198,8 @@ export const defaultCodeReviewSettings: CodeReviewSettings = {
 };
 
 // Hapi remote sharing settings
+export type TunnelMode = 'quick' | 'auth';
+
 export interface HapiSettings {
   enabled: boolean;
   webappPort: number;
@@ -205,6 +207,11 @@ export interface HapiSettings {
   telegramBotToken: string;
   webappUrl: string;
   allowedChatIds: string;
+  // Cloudflared settings
+  cfEnabled: boolean;
+  tunnelMode: TunnelMode;
+  tunnelToken: string;
+  useHttp2: boolean;
 }
 
 export const defaultHapiSettings: HapiSettings = {
@@ -214,6 +221,11 @@ export const defaultHapiSettings: HapiSettings = {
   telegramBotToken: '',
   webappUrl: '',
   allowedChatIds: '',
+  // Cloudflared defaults
+  cfEnabled: false,
+  tunnelMode: 'quick',
+  tunnelToken: '',
+  useHttp2: true,
 };
 
 // Editor settings

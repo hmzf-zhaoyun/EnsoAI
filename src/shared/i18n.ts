@@ -617,6 +617,21 @@ export const zhTranslations: Record<string, string> = {
   'Public URL for Telegram Mini App': 'Telegram Mini App 的公开 URL',
   'Allowed Chat IDs': '允许的会话 ID',
   'Comma-separated Telegram chat IDs': '用逗号分隔的 Telegram 会话 ID',
+  // Cloudflared
+  'Public Access (Cloudflared)': '公网访问 (Cloudflared)',
+  'Expose local server to the internet via Cloudflare Tunnel':
+    '通过 Cloudflare Tunnel 将本地服务暴露到公网',
+  'Installing...': '安装中...',
+  Install: '安装',
+  'Quick Tunnel': '快速隧道',
+  'Auth Tunnel': '认证隧道',
+  'Create a temporary tunnel with auto-generated URL. No authentication required.':
+    '创建临时隧道，自动生成 URL，无需认证。',
+  'Use a pre-configured tunnel with your Cloudflare account.': '使用 Cloudflare 账户预配置的隧道。',
+  'Tunnel Token': '隧道令牌',
+  'Starting...': '启动中...',
+  'Use HTTP/2 Protocol': '使用 HTTP/2 协议',
+  'More compatible than QUIC when behind firewalls': '在防火墙后比 QUIC 更兼容',
 };
 
 export function normalizeLocale(input?: string): Locale {
