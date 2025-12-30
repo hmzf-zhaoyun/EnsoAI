@@ -27,6 +27,7 @@ interface SessionBarProps {
   onNewSession: () => void;
   onNewSessionWithAgent?: (agentId: string, agentCommand: string) => void;
   onRenameSession: (id: string, name: string) => void;
+  onReorderSessions?: (fromIndex: number, toIndex: number) => void;
 }
 
 interface BarState {
@@ -62,6 +63,7 @@ export function SessionBar({
   onNewSession,
   onNewSessionWithAgent,
   onRenameSession,
+  onReorderSessions,
 }: SessionBarProps) {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +76,47 @@ export function SessionBar({
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const [installedAgents, setInstalledAgents] = useState<Set<string>>(new Set());
   const dragStart = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+
+  // Tab drag reorder
+  const draggedTabIndexRef = useRef<number | null>(null);
+
+  const handleTabDragStart = useCallback((e: React.DragEvent, index: number) => {
+    draggedTabIndexRef.current = index;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+
+    // Create custom drag image to preserve rounded style
+    const target = e.currentTarget as HTMLElement;
+    const clone = target.cloneNode(true) as HTMLElement;
+    clone.style.position = 'absolute';
+    clone.style.top = '-9999px';
+    clone.style.borderRadius = '9999px';
+    clone.style.overflow = 'hidden';
+    document.body.appendChild(clone);
+    e.dataTransfer.setDragImage(clone, target.offsetWidth / 2, target.offsetHeight / 2);
+    // Clean up clone after drag starts
+    requestAnimationFrame(() => document.body.removeChild(clone));
+
+    // Prevent bar dragging while tab dragging
+    e.stopPropagation();
+  }, []);
+
+  const handleTabDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleTabDrop = useCallback(
+    (e: React.DragEvent, toIndex: number) => {
+      e.preventDefault();
+      const fromIndex = draggedTabIndexRef.current;
+      if (fromIndex !== null && fromIndex !== toIndex && onReorderSessions) {
+        onReorderSessions(fromIndex, toIndex);
+      }
+      draggedTabIndexRef.current = null;
+    },
+    [onReorderSessions]
+  );
 
   // Get enabled agents from settings
   const { agentSettings, customAgents, hapiSettings } = useSettingsStore();
@@ -327,9 +370,13 @@ export function SessionBar({
               <GripVertical className="h-3.5 w-3.5" />
             </div>
 
-            {sessions.map((session) => (
+            {sessions.map((session, index) => (
               <div
                 key={session.id}
+                draggable
+                onDragStart={(e) => handleTabDragStart(e, index)}
+                onDragOver={handleTabDragOver}
+                onDrop={(e) => handleTabDrop(e, index)}
                 onClick={() => onSelectSession(session.id)}
                 onDoubleClick={(e) => {
                   e.stopPropagation();

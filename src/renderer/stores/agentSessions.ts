@@ -17,6 +17,7 @@ interface AgentSessionsState {
   removeSession: (id: string) => void;
   updateSession: (id: string, updates: Partial<Session>) => void;
   setActiveId: (cwd: string, sessionId: string | null) => void;
+  reorderSessions: (repoPath: string, cwd: string, fromIndex: number, toIndex: number) => void;
   getSessions: (repoPath: string, cwd: string) => Session[];
   getActiveSessionId: (repoPath: string, cwd: string) => string | null;
 }
@@ -86,6 +87,26 @@ export const useAgentSessionsStore = create<AgentSessionsState>()(
       set((state) => ({
         activeIds: { ...state.activeIds, [cwd]: sessionId },
       })),
+
+    reorderSessions: (repoPath, cwd, fromIndex, toIndex) =>
+      set((state) => {
+        // Get sessions for current worktree
+        const worktreeSessions = state.sessions.filter(
+          (s) => s.repoPath === repoPath && s.cwd === cwd
+        );
+        const otherSessions = state.sessions.filter(
+          (s) => !(s.repoPath === repoPath && s.cwd === cwd)
+        );
+
+        // Reorder within worktree sessions
+        const reordered = [...worktreeSessions];
+        const [moved] = reordered.splice(fromIndex, 1);
+        if (!moved) return state;
+        reordered.splice(toIndex, 0, moved);
+
+        // Combine back: other sessions + reordered worktree sessions
+        return { sessions: [...otherSessions, ...reordered] };
+      }),
 
     getSessions: (repoPath, cwd) => {
       return get().sessions.filter((s) => s.repoPath === repoPath && s.cwd === cwd);
