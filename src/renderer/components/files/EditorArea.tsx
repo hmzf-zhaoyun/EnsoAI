@@ -91,6 +91,7 @@ export function EditorArea({
   const hasPendingAutoSaveRef = useRef(false);
   const blurDisposableRef = useRef<monaco.IDisposable | null>(null);
   const activeTabPathRef = useRef<string | null>(null);
+  const pendingCursorRef = useRef<PendingCursor | null>(null);
 
   // Calculate breadcrumb segments from active file path
   const breadcrumbSegments = useMemo(() => {
@@ -110,10 +111,14 @@ export function EditorArea({
     }));
   }, [activeTabPath, rootPath]);
 
-  // Keep ref in sync with activeTabPath
+  // Keep refs in sync with state
   useEffect(() => {
     activeTabPathRef.current = activeTabPath;
   }, [activeTabPath]);
+
+  // Sync ref immediately during render (not in useEffect) to ensure
+  // it's available when Monaco's onMount callback fires
+  pendingCursorRef.current = pendingCursor;
 
   // Auto save: Debounced save for 'afterDelay' mode
   // Use ref-based debounce to avoid closure issues with activeTabPath
@@ -294,8 +299,10 @@ export function EditorArea({
       }
 
       // Handle pending cursor navigation on mount (for search result navigation)
-      if (pendingCursor && pendingCursor.path === activeTabPath) {
-        const { line, column, matchLength } = pendingCursor;
+      // Use ref to get latest value since onMount may be called after state update
+      const cursor = pendingCursorRef.current;
+      if (cursor && cursor.path === activeTabPath) {
+        const { line, column, matchLength } = cursor;
         // Convert 0-based column to 1-based for Monaco
         const startColumn = (column ?? 0) + 1;
 
@@ -345,7 +352,6 @@ export function EditorArea({
       claudeCodeIntegration.enabled,
       claudeCodeIntegration.atMentionedKeybinding,
       t,
-      pendingCursor,
       onClearPendingCursor,
     ]
   );

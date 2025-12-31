@@ -161,7 +161,8 @@ export function SearchPreviewPanel({ path, line, query }: SearchPreviewPanelProp
       {/* Monaco Editor */}
       <div className="min-h-0 flex-1">
         <Editor
-          path={path}
+          key={path}
+          path={`preview://${path}`}
           value={content}
           theme={monacoTheme}
           onMount={handleEditorMount}
