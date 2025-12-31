@@ -213,12 +213,18 @@ interface FileTreeNodeComponentProps {
   onCopyPath: (path: string) => void;
 }
 
+// 压缩链中的节点信息
+interface CompactedNodeInfo {
+  path: string;
+  name: string;
+}
+
 // 获取压缩后的显示信息：合并只有单个子目录的路径
 function getCompactedNode(
   node: FileTreeNode,
   expandedPaths: Set<string>
-): { displayName: string; actualNode: FileTreeNode; compactedPaths: string[] } {
-  const compactedPaths: string[] = [];
+): { displayName: string; actualNode: FileTreeNode; compactedChain: CompactedNodeInfo[] } {
+  const compactedChain: CompactedNodeInfo[] = [{ path: node.path, name: node.name }];
   let current = node;
   let displayName = node.name;
 
@@ -229,12 +235,12 @@ function getCompactedNode(
     current.children?.length === 1 &&
     current.children[0].isDirectory
   ) {
-    compactedPaths.push(current.path);
     current = current.children[0];
+    compactedChain.push({ path: current.path, name: current.name });
     displayName = `${displayName}/${current.name}`;
   }
 
-  return { displayName, actualNode: current, compactedPaths };
+  return { displayName, actualNode: current, compactedChain };
 }
 
 function FileTreeNodeComponent({
@@ -260,10 +266,12 @@ function FileTreeNodeComponent({
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
   // 获取压缩后的节点信息
-  const { displayName, actualNode } = getCompactedNode(node, expandedPaths);
+  const { displayName, actualNode, compactedChain } = getCompactedNode(node, expandedPaths);
   const isExpanded = expandedPaths.has(actualNode.path);
   const isSelected = selectedPath === actualNode.path;
-  const isEditing = editingPath === actualNode.path;
+  // 检查压缩链中是否有正在编辑的节点
+  const editingNode = compactedChain.find((n) => n.path === editingPath);
+  const isEditing = !!editingNode;
 
   const Icon = getFileIcon(actualNode.name, actualNode.isDirectory, isExpanded);
   const iconColor = getFileIconColor(actualNode.name, actualNode.isDirectory);
@@ -294,14 +302,15 @@ function FileTreeNodeComponent({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (!editingPath) return;
       if (e.key === 'Enter') {
-        onFinishRename(actualNode.path);
+        onFinishRename(editingPath);
       } else if (e.key === 'Escape') {
         onEditValueChange('');
-        onFinishRename(actualNode.path);
+        onFinishRename(editingPath);
       }
     },
-    [actualNode.path, onFinishRename, onEditValueChange]
+    [editingPath, onFinishRename, onEditValueChange]
   );
 
   return (
@@ -340,12 +349,12 @@ function FileTreeNodeComponent({
         )}
 
         {/* Name or input */}
-        {isEditing ? (
+        {isEditing && editingPath ? (
           <input
             ref={inputRef}
             value={editValue}
             onChange={(e) => onEditValueChange(e.target.value)}
-            onBlur={() => onFinishRename(actualNode.path)}
+            onBlur={() => onFinishRename(editingPath)}
             onKeyDown={handleKeyDown}
             className="h-5 min-w-0 flex-1 rounded border border-ring bg-background px-1 py-0 text-sm outline-none"
             onClick={(e) => e.stopPropagation()}
@@ -379,10 +388,24 @@ function FileTreeNodeComponent({
               <MenuSeparator />
             </>
           )}
-          <MenuItem onClick={() => onStartRename(actualNode.path, actualNode.name)}>
-            <Pencil className="h-4 w-4" />
-            {t('Rename')}
-          </MenuItem>
+          {compactedChain.length === 1 ? (
+            <MenuItem onClick={() => onStartRename(node.path, node.name)}>
+              <Pencil className="h-4 w-4" />
+              {t('Rename')}
+            </MenuItem>
+          ) : (
+            <>
+              <MenuItem disabled inset>
+                <Pencil className="h-4 w-4" />
+                {t('Rename')}
+              </MenuItem>
+              {compactedChain.map((n) => (
+                <MenuItem key={n.path} inset onClick={() => onStartRename(n.path, n.name)}>
+                  {n.name}
+                </MenuItem>
+              ))}
+            </>
+          )}
           <MenuItem onClick={() => onCopyPath(actualNode.path)}>
             <Copy className="h-4 w-4" />
             {t('Copy Path')}
