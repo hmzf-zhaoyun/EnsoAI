@@ -192,6 +192,10 @@ export class AppDetector {
         await execAsync(
           `powershell -Command "Start-Process -FilePath '${escapedExe}' -WorkingDirectory '${escapedPath}'"`
         );
+      } else if (bundleId === 'windows.explorer') {
+        // Explorer needs path with backslashes
+        const windowsPath = path.replace(/\//g, '\\');
+        await execAsync(`start "" "${windowsPath}"`);
       } else {
         const pathArg = options?.line ? `${escapedPath}:${options.line}` : escapedPath;
         await execAsync(
