@@ -246,7 +246,10 @@ export function MainContent({
             activeTab === 'terminal' ? 'z-10' : 'invisible pointer-events-none z-0'
           )}
         >
-          <TerminalPanel cwd={worktreePath} isActive={activeTab === 'terminal'} />
+          <TerminalPanel
+            cwd={effectiveWorktreePath ?? undefined}
+            isActive={activeTab === 'terminal' && hasActiveWorktree}
+          />
         </div>
         {/* File tab - keep mounted to preserve editor state */}
         <div
