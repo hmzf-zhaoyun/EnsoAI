@@ -316,9 +316,9 @@ export function KeybindingsSettings() {
         </div>
       </div>
 
-      {/* Source Control */}
+      {/* Version Control */}
       <div className="border-t pt-6">
-        <h3 className="text-lg font-medium">{t('Source Control')}</h3>
+        <h3 className="text-lg font-medium">{t('Version Control')}</h3>
         <p className="text-sm text-muted-foreground mb-4">{t('Diff navigation shortcuts')}</p>
         <div className="space-y-3">
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">

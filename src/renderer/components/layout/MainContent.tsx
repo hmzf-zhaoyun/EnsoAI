@@ -51,7 +51,7 @@ export function MainContent({
     { id: 'chat', icon: Sparkles, label: t('Agent') },
     { id: 'file', icon: FileCode, label: t('File') },
     { id: 'terminal', icon: Terminal, label: t('Terminal') },
-    { id: 'source-control', icon: GitBranch, label: t('Source Control') },
+    { id: 'source-control', icon: GitBranch, label: t('Version Control') },
   ] satisfies Array<{ id: TabId; icon: React.ElementType; label: string }>;
   // Need extra padding for traffic lights when both panels are collapsed (macOS only)
   const isMac = window.electronAPI.env.platform === 'darwin';

@@ -279,7 +279,7 @@ export function SourceControlPanel({
           <GitBranch className="h-4.5 w-4.5" />
         </EmptyMedia>
         <EmptyHeader>
-          <EmptyTitle>{t('Source Control')}</EmptyTitle>
+          <EmptyTitle>{t('Version Control')}</EmptyTitle>
           <EmptyDescription>{t('Select a Worktree to view changes')}</EmptyDescription>
         </EmptyHeader>
         {onExpandWorktree && worktreeCollapsed && (

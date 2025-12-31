@@ -407,7 +407,17 @@ export const zhTranslations: Record<string, string> = {
   'Select folder': '选择文件夹',
   'Select a file from the file tree to begin editing': '从左侧文件树中选择文件以开始编辑',
   'Skipped {{dirs}} (not in .gitignore)': '已跳过 {{dirs}}（未添加到 .gitignore）',
-  'Source Control': '源代码管理',
+  'Sync with remote': '同步远程',
+  '(commit history)': '(提交历史)',
+  'Open in editor': '在编辑器中打开',
+  'Discard {{count}} changes': '放弃 {{count}} 处更改',
+  'Delete {{count}} files': '删除 {{count}} 个文件',
+  'Are you sure you want to discard changes to {{count}} files? This cannot be undone.':
+    '确定要放弃 {{count}} 个文件的更改吗？此操作不可撤销。',
+  'Are you sure you want to delete {{count}} untracked files? This cannot be undone.':
+    '确定要删除 {{count}} 个未跟踪的文件吗？此操作不可撤销。',
+  'Are you sure you want to delete the untracked file {{path}}? This cannot be undone.':
+    '确定要删除未跟踪的文件 {{path}} 吗？此操作不可撤销。',
   Stage: '暂存',
   'Stage all': '全部暂存',
   'Stage changes before committing': '暂存更改后才能提交',
@@ -429,7 +439,7 @@ export const zhTranslations: Record<string, string> = {
   Unstage: '取消暂存',
   'Unstage all': '全部取消暂存',
   Version: '版本',
-  'Version Control': '版本控制',
+  'Version Control': '版本管理',
   'Version {{version}} has been downloaded. Restart now to install?':
     '新版本 {{version}} 已下载完成，是否立即重启安装？',
   'Version {{version}} is available. Please download it manually.':
