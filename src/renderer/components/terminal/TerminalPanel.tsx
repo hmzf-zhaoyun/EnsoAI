@@ -1,5 +1,15 @@
+import { Plus, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizePath } from '@/App/storage';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { useI18n } from '@/i18n';
 import { matchesKeybinding } from '@/lib/keybinding';
 import { useSettingsStore } from '@/stores/settings';
 import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
@@ -33,6 +43,7 @@ function createInitialGroupState(): GroupState {
 type WorktreeGroupStates = Record<string, GroupState>;
 
 export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
+  const { t } = useI18n();
   const [worktreeStates, setWorktreeStates] = useState<WorktreeGroupStates>({});
   // Global terminal IDs to keep terminals mounted across group moves
   const [globalTerminalIds, setGlobalTerminalIds] = useState<Set<string>>(new Set());
@@ -651,8 +662,21 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
   const hasAnyTerminals = Object.keys(worktreeStates).length > 0;
 
   if (!hasAnyTerminals) {
-    // No terminals anywhere, auto-creation effect will handle it
-    return null;
+    return (
+      <Empty className="h-full border-0">
+        <EmptyMedia variant="icon">
+          <Terminal className="h-4.5 w-4.5" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>{t('No terminals open')}</EmptyTitle>
+          <EmptyDescription>{t('Create a terminal to start working')}</EmptyDescription>
+        </EmptyHeader>
+        <Button variant="outline" size="sm" onClick={handleNewTerminal}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t('New Terminal')}
+        </Button>
+      </Empty>
+    );
   }
 
   // Helper to find tab info

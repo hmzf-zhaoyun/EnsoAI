@@ -169,6 +169,7 @@ export const zhTranslations: Record<string, string> = {
   'No agent sessions': '暂无 Agent Session',
   'No enabled agents': '没有已启用的 Agent',
   'No terminals open': '暂无终端',
+  'Create a terminal to start working': '创建终端以开始工作',
   'Notification delay': '空闲时间',
   'Timed out': '检测超时',
   'Notifications when agent is idle': 'Agent 空闲时发送系统通知',

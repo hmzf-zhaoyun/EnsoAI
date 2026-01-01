@@ -921,8 +921,8 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
 
   if (!cwd) return null;
 
-  // Check if there are any groups
-  const hasAnyGroups = Object.keys(worktreeGroupStates).length > 0;
+  // Check if there are any groups with actual content (not just empty state objects)
+  const hasAnyGroups = Object.values(worktreeGroupStates).some((state) => state.groups.length > 0);
 
   // Helper to find session info (which worktree, group, index)
   const findSessionInfo = (sessionId: string) => {
