@@ -326,13 +326,11 @@ export function useFileTree({ rootPath, enabled = true, isActive = true }: UseFi
     // Refetch root directory first
     await queryClient.refetchQueries({ queryKey: ['file', 'list', rootPath] });
 
-    // Refetch all expanded directories to update the tree with fresh data
+    // Refetch all expanded directories in parallel
     const currentExpanded = Array.from(expandedPathsRef.current);
-    for (const path of currentExpanded) {
-      if (path !== rootPath) {
-        await refreshNodeChildren(path);
-      }
-    }
+    await Promise.all(
+      currentExpanded.filter((path) => path !== rootPath).map((path) => refreshNodeChildren(path))
+    );
   }, [queryClient, rootPath, refreshNodeChildren]);
 
   // Refresh when becoming active if changes occurred while inactive
@@ -354,22 +352,6 @@ export function useFileTree({ rootPath, enabled = true, isActive = true }: UseFi
     deleteItem,
     refresh,
   };
-}
-
-function updateNodeChildren(
-  nodes: FileTreeNode[],
-  targetPath: string,
-  children: FileTreeNode[]
-): FileTreeNode[] {
-  return nodes.map((node) => {
-    if (node.path === targetPath) {
-      return { ...node, children, isLoading: false };
-    }
-    if (node.children) {
-      return { ...node, children: updateNodeChildren(node.children, targetPath, children) };
-    }
-    return node;
-  });
 }
 
 export type { FileTreeNode };
