@@ -1,5 +1,6 @@
 import type { GitBranch as GitBranchType, GitWorktree, WorktreeCreateOptions } from '@shared/types';
 import {
+  Copy,
   FolderOpen,
   GitBranch,
   GitMerge,
@@ -517,6 +518,26 @@ function WorktreeItem({
   const hasActivity = activity.agentCount > 0 || activity.terminalCount > 0;
   const hasDiffStats = diffStats.insertions > 0 || diffStats.deletions > 0;
 
+  const handleCopyPath = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(worktree.path);
+      toastManager.add({
+        title: t('Copied'),
+        description: t('Path copied to clipboard'),
+        type: 'success',
+        timeout: 2000,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toastManager.add({
+        title: t('Copy failed'),
+        description: message || t('Failed to copy content'),
+        type: 'error',
+        timeout: 3000,
+      });
+    }
+  }, [t, worktree.path]);
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const x = e.clientX;
@@ -738,6 +759,19 @@ function WorktreeItem({
               {t('Open folder')}
             </button>
 
+            {/* Copy Path */}
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
+              onClick={() => {
+                setMenuOpen(false);
+                handleCopyPath();
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              {t('Copy Path')}
+            </button>
+
             {/* Merge to Branch */}
             {onMerge && !isMain && !isPrunable && (
               <button
@@ -754,7 +788,7 @@ function WorktreeItem({
             )}
 
             {/* Separator before delete */}
-            {onMerge && !isMain && !isPrunable && <div className="my-1 h-px bg-border" />}
+            <div className="my-1 h-px bg-border" />
 
             {/* Delete Worktree */}
             <button
