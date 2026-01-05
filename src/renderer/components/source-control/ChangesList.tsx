@@ -1,11 +1,13 @@
 import type { FileChange, FileChangeStatus } from '@shared/types';
 import {
+  CheckCircle,
   Eye,
   FileEdit,
   FilePlus,
   FileWarning,
   FileX,
   List,
+  Loader2,
   Minus,
   Plus,
   RefreshCw,
@@ -17,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 import { useSettingsStore } from '@/stores/settings';
 import { useSourceControlStore } from '@/stores/sourceControl';
 import { ChangesTree } from './ChangesTree';
@@ -147,6 +150,25 @@ export function ChangesList({
   const { viewMode, setViewMode } = useSourceControlStore();
   const codeReviewEnabled = useSettingsStore((s) => s.codeReview.enabled);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const isMinimized = useCodeReviewContinueStore((s) => s.isMinimized);
+  const reviewRepoPath = useCodeReviewContinueStore((s) => s.review.repoPath);
+  const reviewStatus = useCodeReviewContinueStore((s) => s.review.status);
+  const isMinimizedForThisRepo = isMinimized && reviewRepoPath === repoPath;
+  const isMinimizedInProgress =
+    isMinimizedForThisRepo && (reviewStatus === 'streaming' || reviewStatus === 'initializing');
+  const isMinimizedComplete = isMinimizedForThisRepo && reviewStatus === 'complete';
+
+  const getReviewButtonIcon = () => {
+    if (isMinimizedInProgress) return <Loader2 className="animate-spin" />;
+    if (isMinimizedComplete) return <CheckCircle className="text-green-500" />;
+    return <Eye />;
+  };
+
+  const getReviewButtonText = () => {
+    if (isMinimizedInProgress) return t('Reviewing...');
+    if (isMinimizedComplete) return t('Review complete');
+    return t('Review');
+  };
 
   // Separate tracked and untracked changes
   const trackedChanges = unstaged.filter((f) => f.status !== 'U');
@@ -175,13 +197,13 @@ export function ChangesList({
         <div className="flex h-9 shrink-0 items-center justify-end gap-2 border-b px-3">
           {codeReviewEnabled && (
             <Button
-              variant="outline"
+              variant={isMinimizedForThisRepo ? 'default' : 'outline'}
               size="xs"
               onClick={() => setIsReviewModalOpen(true)}
-              title={t('Start code review')}
+              title={isMinimizedForThisRepo ? t('View code review') : t('Start code review')}
             >
-              <Eye />
-              {t('Review')}
+              {getReviewButtonIcon()}
+              {getReviewButtonText()}
             </Button>
           )}
           <Button
@@ -238,13 +260,13 @@ export function ChangesList({
       <div className="flex h-9 shrink-0 items-center justify-end gap-2 border-b px-3">
         {codeReviewEnabled && (
           <Button
-            variant="outline"
+            variant={isMinimizedForThisRepo ? 'default' : 'outline'}
             size="xs"
             onClick={() => setIsReviewModalOpen(true)}
-            title={t('Start code review')}
+            title={isMinimizedForThisRepo ? t('View code review') : t('Start code review')}
           >
-            <Eye />
-            {t('Review')}
+            {getReviewButtonIcon()}
+            {getReviewButtonText()}
           </Button>
         )}
         <Button

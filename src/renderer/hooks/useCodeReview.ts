@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ReviewStatus, type StreamEvent, StreamJsonParser } from '@/lib/stream-json-parser';
+import { useCallback } from 'react';
+import {
+  startCodeReview,
+  stopCodeReview,
+  useCodeReviewContinueStore,
+} from '@/stores/codeReviewContinue';
 import { useSettingsStore } from '@/stores/settings';
 
 interface UseCodeReviewOptions {
@@ -8,7 +12,7 @@ interface UseCodeReviewOptions {
 
 interface UseCodeReviewReturn {
   content: string;
-  status: ReviewStatus;
+  status: 'idle' | 'initializing' | 'streaming' | 'complete' | 'error';
   error: string | null;
   cost: number | null;
   model: string | null;
@@ -21,197 +25,36 @@ interface UseCodeReviewReturn {
 
 export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReviewReturn {
   const codeReviewSettings = useSettingsStore((s) => s.codeReview);
-  const [content, setContent] = useState('');
-  const [status, setStatus] = useState<ReviewStatus>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [cost, setCost] = useState<number | null>(null);
-  const [model, setModel] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const review = useCodeReviewContinueStore((s) => s.review);
+  const resetReview = useCodeReviewContinueStore((s) => s.resetReview);
 
-  const parserRef = useRef<StreamJsonParser>(new StreamJsonParser());
-  const reviewIdRef = useRef<string | null>(null);
-  const cleanupFnRef = useRef<(() => void) | null>(null);
-  const statusRef = useRef<ReviewStatus>('idle');
-
-  // 清理函数
-  const cleanup = useCallback(() => {
-    if (cleanupFnRef.current) {
-      cleanupFnRef.current();
-      cleanupFnRef.current = null;
-    }
-
-    if (reviewIdRef.current) {
-      window.electronAPI.git.stopCodeReview(reviewIdRef.current).catch(console.error);
-      reviewIdRef.current = null;
-    }
-  }, []);
-
-  // 组件卸载时清理
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
-
-  // 同步更新状态和 ref
-  const updateStatus = useCallback((newStatus: ReviewStatus) => {
-    statusRef.current = newStatus;
-    setStatus(newStatus);
-  }, []);
-
-  // 处理单个事件
-  const handleEvent = useCallback((event: StreamEvent) => {
-    // 检查初始化事件
-    if (StreamJsonParser.isInitEvent(event)) {
-      updateStatus('streaming');
-      return;
-    }
-
-    // 提取文本增量
-    const text = StreamJsonParser.extractTextDelta(event);
-    if (text) {
-      setContent((prev) => `${prev}${text}`);
-    }
-
-    // 消息结束时添加换行
-    if (StreamJsonParser.isMessageEndEvent(event)) {
-      setContent((prev) => `${prev}\n\n`);
-    }
-
-    // 检查完成事件并提取费用和模型
-    if (StreamJsonParser.isResultEvent(event)) {
-      const totalCost = StreamJsonParser.extractCost(event);
-      if (totalCost !== null) {
-        setCost(totalCost);
-      }
-      const modelName = StreamJsonParser.extractModel(event);
-      if (modelName !== null) {
-        setModel(modelName);
-      }
-      updateStatus('complete');
-    }
-
-    // 检查错误事件
-    if (StreamJsonParser.isErrorEvent(event)) {
-      updateStatus('error');
-      setError(event.message?.toString() || 'Unknown error');
-    }
-  }, [updateStatus]);
-
-  // 开始代码审查
   const startReview = useCallback(async () => {
-    if (!repoPath) {
-      setError('No repository path');
-      updateStatus('error');
-      return;
-    }
+    if (!repoPath) return;
 
-    // 重置状态
-    setContent('');
-    setError(null);
-    setCost(null);
-    setModel(null);
-    setSessionId(null);
-    updateStatus('initializing');
-    parserRef.current.reset();
-    cleanup();
-
-    try {
-      // 生成唯一的 reviewId
-      const reviewId = `review-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      reviewIdRef.current = reviewId;
-
-      // 生成 claude session ID（仅当 continueConversation 开启时）
-      const shouldContinue = codeReviewSettings.continueConversation ?? true;
-      const claudeSessionId = shouldContinue ? crypto.randomUUID() : undefined;
-
-      // 监听数据输出
-      const onDataCleanup = window.electronAPI.git.onCodeReviewData((event) => {
-        if (event.reviewId !== reviewId) return;
-
-        if (event.type === 'data' && event.data) {
-          const events = parserRef.current.parse(event.data);
-          for (const e of events) {
-            handleEvent(e);
-          }
-        } else if (event.type === 'error' && event.data) {
-          // stderr 输出通常是日志，不一定是错误
-          console.warn('[CodeReview stderr]', event.data);
-        } else if (event.type === 'exit') {
-          // 使用 ref 获取最新状态，避免闭包陷阱
-          if (event.exitCode !== 0 && statusRef.current !== 'complete') {
-            updateStatus('error');
-            setError(`Process exited with code ${event.exitCode}`);
-          } else if (statusRef.current !== 'error') {
-            updateStatus('complete');
-          }
-          reviewIdRef.current = null;
-        }
-      });
-      cleanupFnRef.current = onDataCleanup;
-
-      // 启动代码审查
-      const result = await window.electronAPI.git.startCodeReview(repoPath, {
-        model: codeReviewSettings.model,
-        language: codeReviewSettings.language ?? '中文',
-        continueConversation: shouldContinue,
-        sessionId: claudeSessionId,
-        reviewId,
-      });
-
-      if (!result.success) {
-        updateStatus('error');
-        setError(result.error || 'Failed to start review');
-        cleanup();
-      } else if (result.sessionId) {
-        setSessionId(result.sessionId);
-      }
-    } catch (err) {
-      updateStatus('error');
-      setError(err instanceof Error ? err.message : 'Failed to start review');
-      cleanup();
-    }
+    await startCodeReview(repoPath, {
+      model: codeReviewSettings.model,
+      language: codeReviewSettings.language ?? '中文',
+      continueConversation: codeReviewSettings.continueConversation ?? true,
+    });
   }, [
     repoPath,
-    cleanup,
-    handleEvent,
-    updateStatus,
     codeReviewSettings.model,
     codeReviewSettings.language,
     codeReviewSettings.continueConversation,
   ]);
 
-  // 停止审查
-  const stopReview = useCallback(() => {
-    cleanup();
-    updateStatus('idle');
-  }, [cleanup, updateStatus]);
-
-  // 重置状态
-  const reset = useCallback(() => {
-    cleanup();
-    setContent('');
-    setError(null);
-    setCost(null);
-    setModel(null);
-    setSessionId(null);
-    updateStatus('idle');
-    parserRef.current.reset();
-  }, [cleanup, updateStatus]);
-
-  // 处理旧用户没有新字段的情况
   const continueConversation = codeReviewSettings.continueConversation ?? true;
 
   return {
-    content,
-    status,
-    error,
-    cost,
-    model,
-    sessionId,
-    canContinue: continueConversation && sessionId !== null,
+    content: review.content,
+    status: review.status,
+    error: review.error,
+    cost: review.cost,
+    model: review.model,
+    sessionId: review.sessionId,
+    canContinue: continueConversation && review.sessionId !== null,
     startReview,
-    stopReview,
-    reset,
+    stopReview: stopCodeReview,
+    reset: resetReview,
   };
 }
