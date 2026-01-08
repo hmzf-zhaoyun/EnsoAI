@@ -622,7 +622,7 @@ export default function App() {
 
   // Handle adding a local repository
   const handleAddLocalRepository = useCallback(
-    (selectedPath: string) => {
+    (selectedPath: string, groupId: string | null) => {
       // Check if repo already exists
       if (repositories.some((r) => r.path === selectedPath)) {
         return;
@@ -634,6 +634,7 @@ export default function App() {
       const newRepo: Repository = {
         name,
         path: selectedPath,
+        groupId: groupId || undefined,
       };
 
       const updated = [...repositories, newRepo];
@@ -647,7 +648,7 @@ export default function App() {
 
   // Handle cloning a remote repository
   const handleCloneRepository = useCallback(
-    (clonedPath: string) => {
+    (clonedPath: string, groupId: string | null) => {
       // Check if repo already exists
       if (repositories.some((r) => r.path === clonedPath)) {
         setSelectedRepo(clonedPath);
@@ -660,6 +661,7 @@ export default function App() {
       const newRepo: Repository = {
         name,
         path: clonedPath,
+        groupId: groupId || undefined,
       };
 
       const updated = [...repositories, newRepo];
@@ -982,6 +984,8 @@ export default function App() {
       <AddRepositoryDialog
         open={addRepoDialogOpen}
         onOpenChange={setAddRepoDialogOpen}
+        groups={sortedGroups}
+        defaultGroupId={activeGroupId === ALL_GROUP_ID ? null : activeGroupId}
         onAddLocal={handleAddLocalRepository}
         onCloneComplete={handleCloneRepository}
       />

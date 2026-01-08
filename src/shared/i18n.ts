@@ -107,6 +107,7 @@ export const zhTranslations: Record<string, string> = {
   English: '英语',
   'Enter delay': '启动延迟',
   'Enter a new branch name:': '输入新分支名:',
+  Group: '分组',
   'Enter a name for the new file.': '输入新文件的名称。',
   'Enter a name for the new folder.': '输入新文件夹的名称。',
   'Enter commit message... (Cmd/Ctrl+Enter to commit)': '输入提交信息... (Cmd/Ctrl+Enter 提交)',

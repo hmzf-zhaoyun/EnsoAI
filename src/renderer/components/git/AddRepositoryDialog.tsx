@@ -1,6 +1,7 @@
 import type { CloneProgress } from '@shared/types';
 import { FolderOpen, Globe, Loader2 } from 'lucide-react';
 import * as React from 'react';
+import type { RepositoryGroup } from '@/App/constants';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,11 +12,18 @@ import {
   DialogPanel,
   DialogPopup,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/i18n';
 
@@ -24,13 +32,17 @@ type AddMode = 'local' | 'remote';
 interface AddRepositoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddLocal: (path: string) => void;
-  onCloneComplete: (path: string) => void;
+  groups: RepositoryGroup[];
+  defaultGroupId: string | null;
+  onAddLocal: (path: string, groupId: string | null) => void;
+  onCloneComplete: (path: string, groupId: string | null) => void;
 }
 
 export function AddRepositoryDialog({
   open,
   onOpenChange,
+  groups,
+  defaultGroupId,
   onAddLocal,
   onCloneComplete,
 }: AddRepositoryDialogProps) {
@@ -47,6 +59,31 @@ export function AddRepositoryDialog({
     [t]
   );
   const [mode, setMode] = React.useState<AddMode>('local');
+
+  // Group selection state ('' = no group)
+  const [selectedGroupId, setSelectedGroupId] = React.useState<string>('');
+  const prevOpenRef = React.useRef(open);
+  const prevDefaultGroupIdRef = React.useRef<string | null>(defaultGroupId);
+  const groupSelectionTouchedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    const prevDefaultGroupId = prevDefaultGroupIdRef.current;
+
+    if (!wasOpen && open) {
+      groupSelectionTouchedRef.current = false;
+      setSelectedGroupId(defaultGroupId || '');
+    } else if (
+      open &&
+      !groupSelectionTouchedRef.current &&
+      selectedGroupId === (prevDefaultGroupId || '')
+    ) {
+      setSelectedGroupId(defaultGroupId || '');
+    }
+
+    prevOpenRef.current = open;
+    prevDefaultGroupIdRef.current = defaultGroupId;
+  }, [open, defaultGroupId, selectedGroupId]);
 
   // Local mode state
   const [localPath, setLocalPath] = React.useState('');
@@ -128,12 +165,14 @@ export function AddRepositoryDialog({
     e.preventDefault();
     setError(null);
 
+    const groupIdToSave = selectedGroupId ? selectedGroupId : null;
+
     if (mode === 'local') {
       if (!localPath) {
         setError(t('Please select a local repository directory'));
         return;
       }
-      onAddLocal(localPath);
+      onAddLocal(localPath, groupIdToSave);
       handleClose();
     } else {
       // Remote mode
@@ -160,7 +199,7 @@ export function AddRepositoryDialog({
       try {
         const result = await window.electronAPI.git.clone(remoteUrl.trim(), fullPath);
         if (result.success) {
-          onCloneComplete(result.path);
+          onCloneComplete(result.path, groupIdToSave);
           handleClose();
         } else {
           handleCloneError(result.error || t('Clone failed'));
@@ -204,6 +243,8 @@ export function AddRepositoryDialog({
 
   const resetForm = () => {
     setMode('local');
+    groupSelectionTouchedRef.current = false;
+    setSelectedGroupId(defaultGroupId || '');
     setLocalPath('');
     setRemoteUrl('');
     setTargetDir('');
@@ -216,9 +257,7 @@ export function AddRepositoryDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && isCloning) return; // Prevent closing while cloning
-    if (!newOpen) {
-      resetForm();
-    }
+    if (!newOpen) resetForm();
     onOpenChange(newOpen);
   };
 
@@ -233,6 +272,40 @@ export function AddRepositoryDialog({
     if (mode === 'local') return !localPath;
     return !isValidUrl || !targetDir || !repoName.trim();
   };
+
+  const selectedGroupLabel = React.useMemo(() => {
+    if (!selectedGroupId) return t('No Group');
+    const group = groups.find((g) => g.id === selectedGroupId);
+    if (!group) return t('No Group');
+    return `${group.emoji} ${group.name}`;
+  }, [groups, selectedGroupId, t]);
+
+  const groupSelect = (
+    <Field>
+      <FieldLabel>{t('Group')}</FieldLabel>
+      <Select
+        value={selectedGroupId}
+        onValueChange={(v) => {
+          groupSelectionTouchedRef.current = true;
+          setSelectedGroupId(v || '');
+        }}
+        disabled={isCloning}
+      >
+        <SelectTrigger>
+          <SelectValue>{selectedGroupLabel}</SelectValue>
+        </SelectTrigger>
+        <SelectPopup>
+          <SelectItem value="">{t('No Group')}</SelectItem>
+          {groups.length > 0 && <SelectSeparator />}
+          {groups.map((group) => (
+            <SelectItem key={group.id} value={group.id}>
+              {group.emoji} {group.name}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
+    </Field>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -282,6 +355,8 @@ export function AddRepositoryDialog({
                     {t('Select an existing Git repository on your computer.')}
                   </FieldDescription>
                 </Field>
+
+                {groupSelect}
               </TabsContent>
 
               {/* Remote Repository Tab */}
@@ -342,6 +417,8 @@ export function AddRepositoryDialog({
                     {t('The folder name for the cloned repository.')}
                   </FieldDescription>
                 </Field>
+
+                {groupSelect}
 
                 {/* Clone Progress */}
                 {isCloning && (
