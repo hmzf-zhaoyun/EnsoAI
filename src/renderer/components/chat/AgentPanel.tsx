@@ -3,6 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizePath, pathsEqual } from '@/App/storage';
 import { ResizeHandle } from '@/components/terminal/ResizeHandle';
 import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { useI18n } from '@/i18n';
 import { matchesKeybinding } from '@/lib/keybinding';
 import { useAgentSessionsStore } from '@/stores/agentSessions';
@@ -943,77 +950,86 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
       {/* Empty state overlay - shown when current worktree has no sessions */}
       {/* IMPORTANT: Don't use early return here - terminals must stay mounted to prevent PTY destruction */}
       {showEmptyState && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 text-muted-foreground bg-background">
-          <Sparkles className="h-12 w-12 opacity-50" />
-          <p className="text-sm">{t('No agent sessions')}</p>
-          <div
-            className="relative"
-            onMouseEnter={() => setShowAgentMenu(true)}
-            onMouseLeave={() => setShowAgentMenu(false)}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                handleNewSession();
-                setShowAgentMenu(false);
-              }}
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
+          <Empty className="border-0">
+            <EmptyMedia variant="icon">
+              <Sparkles className="h-4.5 w-4.5" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>{t('No agent sessions')}</EmptyTitle>
+              <EmptyDescription>{t('Create a session to start using AI Agent')}</EmptyDescription>
+            </EmptyHeader>
+            <div
+              className="relative"
+              onMouseEnter={() => setShowAgentMenu(true)}
+              onMouseLeave={() => setShowAgentMenu(false)}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              {t('New Session')}
-            </Button>
-            {showAgentMenu && enabledAgents.length > 0 && (
-              <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-50 min-w-40">
-                <div className="rounded-lg border bg-popover p-1 shadow-lg">
-                  <div className="px-2 py-1 text-xs text-muted-foreground">{t('Select Agent')}</div>
-                  {[...enabledAgents]
-                    .sort((a, b) => {
-                      const aDefault = agentSettings[a]?.isDefault ? 1 : 0;
-                      const bDefault = agentSettings[b]?.isDefault ? 1 : 0;
-                      return bDefault - aDefault;
-                    })
-                    .map((agentId) => {
-                      const isHapi = agentId.endsWith('-hapi');
-                      const isHappy = agentId.endsWith('-happy');
-                      const baseId = isHapi
-                        ? agentId.slice(0, -5)
-                        : isHappy
-                          ? agentId.slice(0, -6)
-                          : agentId;
-                      const customAgent = customAgents.find((a) => a.id === baseId);
-                      const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
-                      const name = isHapi
-                        ? `${baseName} (Hapi)`
-                        : isHappy
-                          ? `${baseName} (Happy)`
-                          : baseName;
-                      const isDefault = agentSettings[agentId]?.isDefault;
-                      return (
-                        <button
-                          type="button"
-                          key={agentId}
-                          onClick={() => {
-                            handleNewSessionWithAgent(
-                              agentId,
-                              customAgent?.command ?? AGENT_INFO[baseId]?.command ?? 'claude'
-                            );
-                            setShowAgentMenu(false);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
-                        >
-                          <span>{name}</span>
-                          {isDefault && (
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {t('(default)')}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  handleNewSession();
+                  setShowAgentMenu(false);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('New Session')}
+              </Button>
+              {showAgentMenu && enabledAgents.length > 0 && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-50 min-w-40">
+                  <div className="rounded-lg border bg-popover p-1 shadow-lg">
+                    <div className="px-2 py-1 text-xs text-muted-foreground">
+                      {t('Select Agent')}
+                    </div>
+                    {[...enabledAgents]
+                      .sort((a, b) => {
+                        const aDefault = agentSettings[a]?.isDefault ? 1 : 0;
+                        const bDefault = agentSettings[b]?.isDefault ? 1 : 0;
+                        return bDefault - aDefault;
+                      })
+                      .map((agentId) => {
+                        const isHapi = agentId.endsWith('-hapi');
+                        const isHappy = agentId.endsWith('-happy');
+                        const baseId = isHapi
+                          ? agentId.slice(0, -5)
+                          : isHappy
+                            ? agentId.slice(0, -6)
+                            : agentId;
+                        const customAgent = customAgents.find((a) => a.id === baseId);
+                        const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
+                        const name = isHapi
+                          ? `${baseName} (Hapi)`
+                          : isHappy
+                            ? `${baseName} (Happy)`
+                            : baseName;
+                        const isDefault = agentSettings[agentId]?.isDefault;
+                        return (
+                          <button
+                            type="button"
+                            key={agentId}
+                            onClick={() => {
+                              handleNewSessionWithAgent(
+                                agentId,
+                                customAgent?.command ?? AGENT_INFO[baseId]?.command ?? 'claude'
+                              );
+                              setShowAgentMenu(false);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
+                          >
+                            <span>{name}</span>
+                            {isDefault && (
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {t('(default)')}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </Empty>
         </div>
       )}
       {/* Resize handles - only for current worktree */}

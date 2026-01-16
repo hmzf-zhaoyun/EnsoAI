@@ -520,7 +520,7 @@ export function TreeSidebar({
       {/* Tree List */}
       <div className="flex-1 overflow-auto p-2">
         {repositories.length === 0 ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <FolderGit2 className="h-4.5 w-4.5" />
             </EmptyMedia>
@@ -536,7 +536,7 @@ export function TreeSidebar({
             </Button>
           </Empty>
         ) : filteredRepos.length === 0 ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <Search className="h-4.5 w-4.5" />
             </EmptyMedia>

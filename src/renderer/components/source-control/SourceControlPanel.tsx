@@ -308,7 +308,7 @@ export function SourceControlPanel({
 
   if (!rootPath) {
     return (
-      <Empty>
+      <Empty className="h-full">
         <EmptyMedia variant="icon">
           <GitBranch className="h-4.5 w-4.5" />
         </EmptyMedia>

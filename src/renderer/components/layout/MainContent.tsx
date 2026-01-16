@@ -341,8 +341,8 @@ export function MainContent({
               />
               {/* Show overlay when no worktree is actively selected */}
               {!hasActiveWorktree && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                  <Empty className="border-0 bg-transparent">
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
+                  <Empty className="border-0">
                     <EmptyMedia variant="icon">
                       <Sparkles className="h-4.5 w-4.5" />
                     </EmptyMedia>

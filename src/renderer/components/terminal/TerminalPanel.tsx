@@ -730,7 +730,19 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     clearPendingScript();
   }, [pendingScript, cwd, groups, activeGroupId, updateCurrentState, clearPendingScript]);
 
-  if (!cwd) return null;
+  if (!cwd) {
+    return (
+      <Empty className="h-full">
+        <EmptyMedia variant="icon">
+          <Terminal className="h-4.5 w-4.5" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>{t('Terminal')}</EmptyTitle>
+          <EmptyDescription>{t('Select a Worktree to open terminal')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
 
   const normalizedCwd = normalizePath(cwd);
 

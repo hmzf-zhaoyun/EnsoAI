@@ -271,7 +271,7 @@ export function WorktreePanel({
       {/* Worktree List */}
       <div className="flex-1 overflow-auto p-2">
         {error ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <GitBranch className="h-4.5 w-4.5" />
             </EmptyMedia>
@@ -301,7 +301,7 @@ export function WorktreePanel({
             ))}
           </div>
         ) : filteredWorktreesWithIndex.length === 0 ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <GitBranch className="h-4.5 w-4.5" />
             </EmptyMedia>

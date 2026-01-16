@@ -1,5 +1,14 @@
+import { FileCode } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GlobalSearchDialog, type SearchMode } from '@/components/search';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { useI18n } from '@/i18n';
 
 // Global ref for passing selected text to search dialog
 declare global {
@@ -40,6 +49,7 @@ interface FilePanelProps {
 type NewItemType = 'file' | 'directory' | null;
 
 export function FilePanel({ rootPath, isActive = false, sessionId }: FilePanelProps) {
+  const { t } = useI18n();
   const {
     tree,
     isLoading,
@@ -305,9 +315,15 @@ export function FilePanel({ rootPath, isActive = false, sessionId }: FilePanelPr
 
   if (!rootPath) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <p>Please select a worktree first</p>
-      </div>
+      <Empty className="h-full">
+        <EmptyMedia variant="icon">
+          <FileCode className="h-4.5 w-4.5" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>{t('File Explorer')}</EmptyTitle>
+          <EmptyDescription>{t('Select a Worktree to browse files')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

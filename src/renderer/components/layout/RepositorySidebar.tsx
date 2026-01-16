@@ -254,7 +254,7 @@ export function RepositorySidebar({
       {/* Repository List */}
       <div className="flex-1 overflow-auto p-2">
         {filteredRepos.length === 0 && searchQuery.length > 0 ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <Search className="h-4.5 w-4.5" />
             </EmptyMedia>
@@ -264,7 +264,7 @@ export function RepositorySidebar({
             </EmptyHeader>
           </Empty>
         ) : repositories.length === 0 ? (
-          <Empty className="border-0">
+          <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
               <FolderGit2 className="h-4.5 w-4.5" />
             </EmptyMedia>
