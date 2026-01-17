@@ -1,29 +1,19 @@
 diff --git a/dist/index.cjs b/dist/index.cjs
-index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..29fd2497414d6adfcf842c9302db701a86823f5b 100644
+index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..a74bdd44b4100d0b14c68b5fac1d2134f6692013 100644
 --- a/dist/index.cjs
 +++ b/dist/index.cjs
-@@ -11,6 +11,20 @@ var zod = require('zod');
+@@ -11,6 +11,10 @@ var zod = require('zod');
  var providerUtils = require('@ai-sdk/provider-utils');
  
  var _documentCurrentScript = typeof document !== 'undefined' ? document.currentScript : null;
 +
-+// Windows cmd resolution helper (avoids shell:true which has ENAMETOOLONG issues)
-+var _winCmdCache = {};
-+function _resolveCmd(cmd) {
-+  if (process.platform !== "win32") return cmd;
-+  if (_winCmdCache[cmd]) return _winCmdCache[cmd];
-+  try {
-+    var out = child_process.execSync("where " + cmd, { encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"] });
-+    var p = out.split(/\r?\n/)[0]?.trim();
-+    if (p) { _winCmdCache[cmd] = p; return p; }
-+  } catch {}
-+  return cmd;
-+}
++// Windows platform detection for shell mode
++var _isWindows = process.platform === "win32";
 +
  // src/codex-cli-provider.ts
  
  // src/logger.ts
-@@ -637,7 +651,7 @@ var CodexCliLanguageModel = class {
+@@ -637,7 +641,7 @@ var CodexCliLanguageModel = class {
      if (tempImagePaths.length > 0) {
        args.push("--");
      }
@@ -32,7 +22,7 @@ index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..29fd2497414d6adfcf842c9302db701a
      return {
        cmd: base.cmd,
        args,
-@@ -646,7 +660,8 @@ var CodexCliLanguageModel = class {
+@@ -646,7 +650,8 @@ var CodexCliLanguageModel = class {
        lastMessagePath,
        lastMessageIsTemp,
        schemaPath,
@@ -42,7 +32,7 @@ index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..29fd2497414d6adfcf842c9302db701a
      };
    }
    applyMcpSettings(args, settings) {
-@@ -999,7 +1014,7 @@ var CodexCliLanguageModel = class {
+@@ -999,7 +1004,7 @@ var CodexCliLanguageModel = class {
      });
      const effectiveSettings = this.mergeSettings(providerOptions);
      const responseFormat = options.responseFormat?.type === "json" ? { type: "json", schema: options.responseFormat.schema } : void 0;
@@ -51,19 +41,18 @@ index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..29fd2497414d6adfcf842c9302db701a
      this.logger.debug(
        `[codex-cli] Executing Codex CLI: ${cmd} with ${args.length} arguments, cwd: ${cwd ?? "default"}`
      );
-@@ -1007,7 +1022,10 @@ var CodexCliLanguageModel = class {
+@@ -1007,7 +1012,9 @@ var CodexCliLanguageModel = class {
      let usage = createEmptyCodexUsage();
      const finishReason = mapCodexCliFinishReason(void 0);
      const startTime = Date.now();
 -    const child = child_process.spawn(cmd, args, { env, cwd, stdio: ["ignore", "pipe", "pipe"] });
-+    const child = child_process.spawn(_resolveCmd(cmd), args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
-+    // Pass prompt via stdin to avoid Windows command line length limits
++    const child = child_process.spawn(cmd, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"], shell: _isWindows });
 +    child.stdin.write(stdinPrompt);
 +    child.stdin.end();
      let onAbort;
      if (options.abortSignal) {
        if (options.abortSignal.aborted) {
-@@ -1165,14 +1183,17 @@ var CodexCliLanguageModel = class {
+@@ -1165,14 +1172,16 @@ var CodexCliLanguageModel = class {
      });
      const effectiveSettings = this.mergeSettings(providerOptions);
      const responseFormat = options.responseFormat?.type === "json" ? { type: "json", schema: options.responseFormat.schema } : void 0;
@@ -76,15 +65,14 @@ index 55cf4a22bc67386d3ff619ca4ef554b3ed7d76b0..29fd2497414d6adfcf842c9302db701a
        start: (controller) => {
          const startTime = Date.now();
 -        const child = child_process.spawn(cmd, args, { env, cwd, stdio: ["ignore", "pipe", "pipe"] });
-+        const child = child_process.spawn(_resolveCmd(cmd), args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
-+        // Pass prompt via stdin to avoid Windows command line length limits
++        const child = child_process.spawn(cmd, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"], shell: _isWindows });
 +        child.stdin.write(stdinPrompt);
 +        child.stdin.end();
          controller.enqueue({ type: "stream-start", warnings });
          let stderr = "";
          let accumulatedText = "";
 diff --git a/dist/index.js b/dist/index.js
-index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3bf97bc878 100644
+index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..e4834417799a82e4efa1a0848390e01cd5cd604f 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,5 +1,5 @@
@@ -94,27 +82,17 @@ index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3b
  import { randomUUID } from 'crypto';
  import { createRequire } from 'module';
  import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs';
-@@ -8,6 +8,19 @@ import { join, dirname } from 'path';
+@@ -8,6 +8,9 @@ import { join, dirname } from 'path';
  import { z } from 'zod';
  import { parseProviderOptions, generateId } from '@ai-sdk/provider-utils';
  
-+// Windows cmd resolution helper (avoids shell:true which has ENAMETOOLONG issues)
-+var _winCmdCache = {};
-+function _resolveCmd(cmd) {
-+  if (process.platform !== "win32") return cmd;
-+  if (_winCmdCache[cmd]) return _winCmdCache[cmd];
-+  try {
-+    var out = execSync("where " + cmd, { encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"] });
-+    var p = out.split(/\r?\n/)[0]?.trim();
-+    if (p) { _winCmdCache[cmd] = p; return p; }
-+  } catch {}
-+  return cmd;
-+}
++// Windows platform detection for shell mode
++var _isWindows = process.platform === "win32";
 +
  // src/codex-cli-provider.ts
  
  // src/logger.ts
-@@ -634,7 +647,7 @@ var CodexCliLanguageModel = class {
+@@ -634,7 +637,7 @@ var CodexCliLanguageModel = class {
      if (tempImagePaths.length > 0) {
        args.push("--");
      }
@@ -123,7 +101,7 @@ index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3b
      return {
        cmd: base.cmd,
        args,
-@@ -643,7 +656,8 @@ var CodexCliLanguageModel = class {
+@@ -643,7 +646,8 @@ var CodexCliLanguageModel = class {
        lastMessagePath,
        lastMessageIsTemp,
        schemaPath,
@@ -133,7 +111,7 @@ index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3b
      };
    }
    applyMcpSettings(args, settings) {
-@@ -996,7 +1010,7 @@ var CodexCliLanguageModel = class {
+@@ -996,7 +1000,7 @@ var CodexCliLanguageModel = class {
      });
      const effectiveSettings = this.mergeSettings(providerOptions);
      const responseFormat = options.responseFormat?.type === "json" ? { type: "json", schema: options.responseFormat.schema } : void 0;
@@ -142,19 +120,18 @@ index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3b
      this.logger.debug(
        `[codex-cli] Executing Codex CLI: ${cmd} with ${args.length} arguments, cwd: ${cwd ?? "default"}`
      );
-@@ -1004,7 +1018,10 @@ var CodexCliLanguageModel = class {
+@@ -1004,7 +1008,9 @@ var CodexCliLanguageModel = class {
      let usage = createEmptyCodexUsage();
      const finishReason = mapCodexCliFinishReason(void 0);
      const startTime = Date.now();
 -    const child = spawn(cmd, args, { env, cwd, stdio: ["ignore", "pipe", "pipe"] });
-+    const child = spawn(_resolveCmd(cmd), args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
-+    // Pass prompt via stdin to avoid Windows command line length limits
++    const child = spawn(cmd, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"], shell: _isWindows });
 +    child.stdin.write(stdinPrompt);
 +    child.stdin.end();
      let onAbort;
      if (options.abortSignal) {
        if (options.abortSignal.aborted) {
-@@ -1162,14 +1179,17 @@ var CodexCliLanguageModel = class {
+@@ -1162,14 +1168,16 @@ var CodexCliLanguageModel = class {
      });
      const effectiveSettings = this.mergeSettings(providerOptions);
      const responseFormat = options.responseFormat?.type === "json" ? { type: "json", schema: options.responseFormat.schema } : void 0;
@@ -167,8 +144,7 @@ index 3178db792b8e4b26245ecf2d9c52ab010d0d9cc9..dce10b8ba8b1bfe18fd9c64c7f0c9b3b
        start: (controller) => {
          const startTime = Date.now();
 -        const child = spawn(cmd, args, { env, cwd, stdio: ["ignore", "pipe", "pipe"] });
-+        const child = spawn(_resolveCmd(cmd), args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
-+        // Pass prompt via stdin to avoid Windows command line length limits
++        const child = spawn(cmd, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"], shell: _isWindows });
 +        child.stdin.write(stdinPrompt);
 +        child.stdin.end();
          controller.enqueue({ type: "stream-start", warnings });
