@@ -1,8 +1,14 @@
-import type { GitBranch as GitBranchType, GitWorktree, WorktreeCreateOptions } from '@shared/types';
+import type {
+  GitBranch as GitBranchType,
+  GitWorktree,
+  TempWorkspaceItem,
+  WorktreeCreateOptions,
+} from '@shared/types';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import {
   ArrowDown,
   ChevronRight,
+  Clock,
   Copy,
   FolderGit2,
   FolderMinus,
@@ -21,7 +27,13 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ALL_GROUP_ID, type Repository, type RepositoryGroup, type TabId } from '@/App/constants';
+import {
+  ALL_GROUP_ID,
+  type Repository,
+  type RepositoryGroup,
+  type TabId,
+  TEMP_REPO_ID,
+} from '@/App/constants';
 import {
   CreateGroupDialog,
   GroupEditDialog,
@@ -29,6 +41,7 @@ import {
   MoveToGroupSubmenu,
 } from '@/components/group';
 import { RepositorySettingsDialog } from '@/components/repository/RepositorySettingsDialog';
+import { TempWorkspaceContextMenu } from '@/components/temp-workspace/TempWorkspaceContextMenu';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -99,6 +112,13 @@ interface TreeSidebarProps {
   onMoveToGroup?: (repoPath: string, groupId: string | null) => void;
   onSwitchTab?: (tab: TabId) => void;
   onSwitchWorktreeByPath?: (path: string) => Promise<void> | void;
+  temporaryWorkspaceEnabled?: boolean;
+  tempWorkspaces?: TempWorkspaceItem[];
+  tempBasePath?: string;
+  onSelectTempWorkspace?: (path: string) => void;
+  onCreateTempWorkspace?: () => void;
+  onRequestTempRename?: (id: string) => void;
+  onRequestTempDelete?: (id: string) => void;
   /** Ref callback to expose toggleSelectedRepoExpanded function */
   toggleSelectedRepoExpandedRef?: React.MutableRefObject<(() => void) | null>;
   /** Whether a file is being dragged over the sidebar (from App.tsx global handler) */
@@ -139,12 +159,20 @@ export function TreeSidebar({
   onMoveToGroup,
   onSwitchTab,
   onSwitchWorktreeByPath,
+  temporaryWorkspaceEnabled = false,
+  tempWorkspaces = [],
+  tempBasePath = '',
+  onSelectTempWorkspace,
+  onCreateTempWorkspace,
+  onRequestTempRename,
+  onRequestTempDelete,
   toggleSelectedRepoExpandedRef,
   isFileDragOver,
 }: TreeSidebarProps) {
   const { t, tNode } = useI18n();
   const _settingsDisplayMode = useSettingsStore((s) => s.settingsDisplayMode);
   const [searchQuery, setSearchQuery] = useState('');
+  const [tempExpanded, setTempExpanded] = useState(true);
   const [expandedRepoList, setExpandedRepoList] = useState<string[]>([]);
 
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
@@ -159,6 +187,10 @@ export function TreeSidebar({
     }
     return counts;
   }, [groups, repositories]);
+  const sortedTempWorkspaces = useMemo(
+    () => [...tempWorkspaces].sort((a, b) => b.createdAt - a.createdAt),
+    [tempWorkspaces]
+  );
 
   // Convert list to set for fast lookups
   const expandedRepos = useMemo(() => new Set(expandedRepoList), [expandedRepoList]);
@@ -257,6 +289,10 @@ export function TreeSidebar({
   const skipAutoExpandRef = useRef(false);
   useEffect(() => {
     if (selectedRepo && selectedRepo !== prevSelectedRepoRef.current) {
+      if (selectedRepo === TEMP_REPO_ID) {
+        prevSelectedRepoRef.current = selectedRepo;
+        return;
+      }
       // Skip auto-expand if user explicitly clicked the tree
       if (!skipAutoExpandRef.current && !expandedRepos.has(selectedRepo)) {
         setExpandedRepoList((prev) => [...prev, selectedRepo]);
@@ -278,9 +314,13 @@ export function TreeSidebar({
   // Expose toggle function for selected repo via ref
   useEffect(() => {
     if (toggleSelectedRepoExpandedRef) {
-      toggleSelectedRepoExpandedRef.current = selectedRepo
-        ? () => toggleRepoExpanded(selectedRepo)
-        : null;
+      if (!selectedRepo) {
+        toggleSelectedRepoExpandedRef.current = null;
+      } else if (selectedRepo === TEMP_REPO_ID) {
+        toggleSelectedRepoExpandedRef.current = () => setTempExpanded((prev) => !prev);
+      } else {
+        toggleSelectedRepoExpandedRef.current = () => toggleRepoExpanded(selectedRepo);
+      }
     }
     return () => {
       if (toggleSelectedRepoExpandedRef) {
@@ -530,6 +570,97 @@ export function TreeSidebar({
 
       {/* Tree List */}
       <div className="flex-1 overflow-auto p-2">
+        {temporaryWorkspaceEnabled && (
+          <div className="mb-2">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setTempExpanded((prev) => !prev)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setTempExpanded((prev) => !prev);
+                }
+              }}
+              className={cn(
+                'group relative flex w-full flex-col gap-1 rounded-lg px-2 py-2 text-left transition-colors cursor-pointer',
+                selectedRepo === TEMP_REPO_ID ? 'text-accent-foreground' : 'hover:bg-accent/30'
+              )}
+            >
+              {selectedRepo === TEMP_REPO_ID && (
+                <motion.div
+                  layoutId="temp-root-highlight"
+                  className="absolute inset-0 rounded-lg bg-accent/50"
+                  transition={springFast}
+                />
+              )}
+              <div className="relative z-10 flex w-full items-center gap-1">
+                <span className="shrink-0 w-5 h-5 flex items-center justify-center">
+                  <ChevronRight
+                    className={cn(
+                      'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                      tempExpanded && 'rotate-90'
+                    )}
+                  />
+                </span>
+                <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate font-medium text-sm text-left">
+                  {t('Temp Session')}
+                </span>
+                {onCreateTempWorkspace && (
+                  <button
+                    type="button"
+                    className="shrink-0 p-1 rounded hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateTempWorkspace();
+                    }}
+                    title={t('New Temp Session')}
+                  >
+                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              {tempBasePath && (
+                <span className="relative z-10 pl-6 overflow-hidden whitespace-nowrap text-ellipsis text-xs text-muted-foreground [direction:rtl] [text-align:left] [unicode-bidi:plaintext]">
+                  {tempBasePath}
+                </span>
+              )}
+            </div>
+
+            <AnimatePresence initial={false}>
+              {tempExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className="ml-4 mt-1 space-y-0.5 overflow-hidden"
+                >
+                  {sortedTempWorkspaces.length === 0 ? (
+                    <div className="py-2 px-2 text-xs text-muted-foreground">
+                      {t('No temp sessions')}
+                    </div>
+                  ) : (
+                    sortedTempWorkspaces.map((item) => (
+                      <TempWorkspaceTreeItem
+                        key={item.id}
+                        item={item}
+                        isActive={
+                          selectedRepo === TEMP_REPO_ID && activeWorktree?.path === item.path
+                        }
+                        onSelect={() => onSelectTempWorkspace?.(item.path)}
+                        onRequestRename={() => onRequestTempRename?.(item.id)}
+                        onRequestDelete={() => onRequestTempDelete?.(item.id)}
+                      />
+                    ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {repositories.length === 0 ? (
           <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
@@ -1084,6 +1215,89 @@ export function TreeSidebar({
         onDelete={onDeleteGroup}
       />
     </aside>
+  );
+}
+
+interface TempWorkspaceTreeItemProps {
+  item: TempWorkspaceItem;
+  isActive: boolean;
+  onSelect: () => void;
+  onRequestRename: () => void;
+  onRequestDelete: () => void;
+}
+
+function TempWorkspaceTreeItem({
+  item,
+  isActive,
+  onSelect,
+  onRequestRename,
+  onRequestDelete,
+}: TempWorkspaceTreeItemProps) {
+  const { t } = useI18n();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const activities = useWorktreeActivityStore((s) => s.activities);
+  const activity = activities[item.path] || { agentCount: 0, terminalCount: 0 };
+  const hasActivity = activity.agentCount > 0 || activity.terminalCount > 0;
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenuPosition({ x: e.clientX, y: e.clientY });
+    setMenuOpen(true);
+  };
+
+  return (
+    <>
+      <div className="relative rounded-lg">
+        <button
+          type="button"
+          onClick={onSelect}
+          onContextMenu={handleContextMenu}
+          className={cn(
+            'group relative flex w-full items-center gap-2 rounded-lg px-2 py-1.5 pl-[24px] text-left transition-colors',
+            isActive ? 'text-accent-foreground' : 'hover:bg-accent/30'
+          )}
+        >
+          {isActive && (
+            <motion.div
+              layoutId="temp-workspace-highlight"
+              className="absolute inset-0 rounded-lg bg-accent/50"
+              transition={springFast}
+            />
+          )}
+          <GitBranch className="relative z-10 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="relative z-10 min-w-0 flex-1 truncate text-sm">{item.title}</span>
+          <span className="relative z-10 shrink-0 rounded bg-emerald-500/20 px-1 py-0.5 text-[9px] font-medium uppercase text-emerald-600 dark:text-emerald-400">
+            {t('Main')}
+          </span>
+          {hasActivity && (
+            <div className="relative z-10 flex items-center gap-1.5 shrink-0 text-[10px] text-muted-foreground">
+              {activity.agentCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Sparkles className="h-3 w-3" />
+                  {activity.agentCount}
+                </span>
+              )}
+              {activity.terminalCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Terminal className="h-3 w-3" />
+                  {activity.terminalCount}
+                </span>
+              )}
+            </div>
+          )}
+        </button>
+      </div>
+
+      <TempWorkspaceContextMenu
+        open={menuOpen}
+        position={menuPosition}
+        path={item.path}
+        onClose={() => setMenuOpen(false)}
+        onRename={onRequestRename}
+        onDelete={onRequestDelete}
+      />
+    </>
   );
 }
 
