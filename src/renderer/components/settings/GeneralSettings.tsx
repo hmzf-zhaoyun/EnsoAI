@@ -91,6 +91,8 @@ export function GeneralSettings() {
     setAutoCreateSessionOnActivate,
     quickTerminal,
     setQuickTerminalEnabled,
+    hideGroups,
+    setHideGroups,
     temporaryWorkspaceEnabled,
     setTemporaryWorkspaceEnabled,
     defaultTemporaryPath,
@@ -387,6 +389,17 @@ export function GeneralSettings() {
           <p className="text-xs text-muted-foreground">
             {t('Default directory for new temp sessions. Leave empty to use ~/ensoai/temporary')}
           </p>
+        </div>
+      </div>
+
+      {/* Hide Groups */}
+      <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+        <span className="text-sm font-medium">{t('Hide Groups')}</span>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {t('Hide group management panel and show all repositories')}
+          </p>
+          <Switch checked={hideGroups} onCheckedChange={setHideGroups} />
         </div>
       </div>
 

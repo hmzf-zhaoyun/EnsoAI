@@ -102,6 +102,7 @@ export function RepositorySidebar({
 }: RepositorySidebarProps) {
   const { t, tNode } = useI18n();
   const _settingsDisplayMode = useSettingsStore((s) => s.settingsDisplayMode);
+  const hideGroups = useSettingsStore((s) => s.hideGroups);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -247,16 +248,18 @@ export function RepositorySidebar({
         )}
       </div>
 
-      {/* Group Selector */}
-      <GroupSelector
-        groups={groups}
-        activeGroupId={activeGroupId}
-        repositoryCounts={repositoryCounts}
-        totalCount={repositories.length}
-        onSelectGroup={onSwitchGroup}
-        onEditGroup={() => setEditGroupDialogOpen(true)}
-        onAddGroup={() => setCreateGroupDialogOpen(true)}
-      />
+      {/* Group Selector - only show when groups are not hidden */}
+      {!hideGroups && (
+        <GroupSelector
+          groups={groups}
+          activeGroupId={activeGroupId}
+          repositoryCounts={repositoryCounts}
+          totalCount={repositories.length}
+          onSelectGroup={onSwitchGroup}
+          onEditGroup={() => setEditGroupDialogOpen(true)}
+          onAddGroup={() => setCreateGroupDialogOpen(true)}
+        />
+      )}
 
       {/* Search */}
       <div className="px-3 py-2">
@@ -387,8 +390,8 @@ export function RepositorySidebar({
                         />
                         <span className="truncate font-medium flex-1">{repo.name}</span>
 
-                        {/* Group Tag - 移到这里 */}
-                        {group && (
+                        {/* Group Tag - only show when groups are not hidden */}
+                        {!hideGroups && group && (
                           <span
                             className="shrink-0 inline-flex h-5 items-center gap-1 rounded-md border px-1.5 text-[10px] text-foreground/80"
                             style={{
@@ -486,7 +489,8 @@ export function RepositorySidebar({
             className="fixed z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >
-            {onMoveToGroup && groups.length > 0 && (
+            {/* Move to Group - only show when groups are not hidden */}
+            {!hideGroups && onMoveToGroup && groups.length > 0 && (
               <MoveToGroupSubmenu
                 groups={groups}
                 currentGroupId={menuRepo?.groupId}
@@ -499,7 +503,9 @@ export function RepositorySidebar({
               />
             )}
 
-            {onMoveToGroup && groups.length > 0 && <div className="my-1 h-px bg-border" />}
+            {!hideGroups && onMoveToGroup && groups.length > 0 && (
+              <div className="my-1 h-px bg-border" />
+            )}
 
             <button
               type="button"

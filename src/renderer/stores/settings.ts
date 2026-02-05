@@ -593,6 +593,8 @@ interface SettingsState {
   quickTerminal: QuickTerminalSettings;
   // Web Inspector settings
   webInspectorEnabled: boolean;
+  // Hide Groups setting
+  hideGroups: boolean;
 
   setTheme: (theme: Theme) => void;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -678,6 +680,8 @@ interface SettingsState {
   setQuickTerminalOpen: (open: boolean) => void;
   // Web Inspector methods
   setWebInspectorEnabled: (enabled: boolean) => void;
+  // Hide Groups method
+  setHideGroups: (hide: boolean) => void;
 }
 
 const defaultAgentSettings: AgentSettings = {
@@ -759,6 +763,8 @@ export const useSettingsStore = create<SettingsState>()(
       },
       // Web Inspector defaults
       webInspectorEnabled: false,
+      // Hide Groups default
+      hideGroups: false,
 
       setTheme: (theme) => {
         const terminalTheme = get().terminalTheme;
@@ -1089,6 +1095,8 @@ export const useSettingsStore = create<SettingsState>()(
           await window.electronAPI.webInspector.stop();
         }
       },
+      // Hide Groups method
+      setHideGroups: (hideGroups) => set({ hideGroups }),
     }),
     {
       name: 'enso-settings',
